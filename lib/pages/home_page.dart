@@ -204,7 +204,8 @@ class _HomePageState extends State<HomePage> {
                   final status = (data['status'] ?? '') as String;
 
                   final matchesSearch =
-                      _searchKeyword.isEmpty || name.toLowerCase().contains(_searchKeyword.toLowerCase());
+                      _searchKeyword.isEmpty ||
+                      name.toLowerCase().contains(_searchKeyword.toLowerCase());
                   final matchesDept =
                       _selectedDepartment == '전체' ||
                       department == _selectedDepartment;
@@ -227,7 +228,7 @@ class _HomePageState extends State<HomePage> {
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final data = filtered[index].data() as Map<String, dynamic>;
-                    inal name = (data['name'] ?? '') as String;
+                    final name = (data['name'] ?? '') as String;
                     final number = data['number'] ?? '';
                     final createdBy = data['createdBy'] ?? 'unknown';
 
