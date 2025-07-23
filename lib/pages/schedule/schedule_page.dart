@@ -13,14 +13,21 @@ class _SchedulePageState extends State<SchedulePage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
-  // 임시 데이터
+  @override
+  void initState() {
+    super.initState();
+    // ✅ 앱 시작 시 오늘 날짜 선택
+    _selectedDay = _focusedDay;
+  }
+
+  // 임시 이벤트 데이터 (추후 Firestore로 교체)
   final List<Map<String, dynamic>> _events = [
     {
       'date': DateTime(2025, 7, 25),
       'type': 'lesson',
       'time': '20:00~22:00',
       'location': '금천구 풋살장',
-      'latlng': '37.456,126.895', // 지도 연동용 좌표 or 주소
+      'latlng': '37.456,126.895',
       'attend': 12,
     },
     {
@@ -28,12 +35,12 @@ class _SchedulePageState extends State<SchedulePage> {
       'type': 'match',
       'time': '18:00~20:00',
       'location': '구로 풋살장',
-      'latlng': '구로구 고척동 123-4', // 주소만 넣어도 가능
+      'latlng': '구로구 고척동 123-4',
       'attend': 9,
     },
   ];
 
-  // 선택된 날짜의 일정 필터링
+  // 선택된 날짜에 해당하는 이벤트
   List<Map<String, dynamic>> get _selectedEvents {
     if (_selectedDay == null) return [];
     return _events.where((e) {
@@ -43,8 +50,10 @@ class _SchedulePageState extends State<SchedulePage> {
     }).toList();
   }
 
-  Future<void> _openMap(String location) async {
-    final encoded = Uri.encodeComponent(location);
+  // ✅ 지도 연동 (latlng 우선, 없으면 location)
+  Future<void> _openMap(Map<String, dynamic> event) async {
+    final query = event['latlng'] ?? event['location'];
+    final encoded = Uri.encodeComponent(query);
     final googleUrl = 'https://www.google.com/maps/search/?api=1&query=$encoded';
 
     if (await canLaunchUrl(Uri.parse(googleUrl))) {
@@ -62,7 +71,24 @@ class _SchedulePageState extends State<SchedulePage> {
       appBar: AppBar(title: const Text('📅 일정')),
       body: Column(
         children: [
-          // 달력 영역
+          // ✅ 범례(legend)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.circle, color: Colors.blue, size: 10),
+                SizedBox(width: 4),
+                Text('수업'),
+                SizedBox(width: 16),
+                Icon(Icons.circle, color: Colors.green, size: 10),
+                SizedBox(width: 4),
+                Text('매치'),
+              ],
+            ),
+          ),
+
+          // 달력
           TableCalendar(
             firstDay: DateTime.utc(2020, 1, 1),
             lastDay: DateTime.utc(2030, 12, 31),
@@ -74,9 +100,20 @@ class _SchedulePageState extends State<SchedulePage> {
                 _focusedDay = focusedDay;
               });
             },
+            // ✅ 달력 스타일
+            calendarStyle: const CalendarStyle(
+              todayDecoration: BoxDecoration(
+                color: Colors.orange,
+                shape: BoxShape.circle,
+              ),
+              selectedDecoration: BoxDecoration(
+                color: Colors.blue,
+                shape: BoxShape.circle,
+              ),
+            ),
+            // ✅ 날짜 아래 점 표시
             calendarBuilders: CalendarBuilders(
               markerBuilder: (context, date, events) {
-                // 이벤트 점 표시
                 final hasLesson = _events.any((e) =>
                     isSameDay(e['date'], date) && e['type'] == 'lesson');
                 final hasMatch = _events.any((e) =>
@@ -93,8 +130,10 @@ class _SchedulePageState extends State<SchedulePage> {
               },
             ),
           ),
+
           const Divider(),
-          // 선택한 날짜 표시
+
+          // 선택한 날짜
           if (_selectedDay != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -103,6 +142,7 @@ class _SchedulePageState extends State<SchedulePage> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
+
           // 일정 리스트
           Expanded(
             child: ListView.builder(
@@ -121,7 +161,8 @@ class _SchedulePageState extends State<SchedulePage> {
                           : Colors.green,
                     ),
                     title: Text(
-                        '${event['type'] == 'lesson' ? '수업' : '매치'} ${event['time']}'),
+                      '${event['type'] == 'lesson' ? '수업' : '매치'} ${event['time']}',
+                    ),
                     subtitle: Text('@${event['location']} (${event['attend']}명 참석)'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -129,19 +170,19 @@ class _SchedulePageState extends State<SchedulePage> {
                         IconButton(
                           icon: const Icon(Icons.check_circle, color: Colors.green),
                           onPressed: () {
-                            // 참석 로직 (Firestore 업데이트 예정)
+                            // 참석 로직(Firestore 연동 예정)
                           },
                         ),
                         IconButton(
                           icon: const Icon(Icons.cancel, color: Colors.red),
                           onPressed: () {
-                            // 불참 로직 (Firestore 업데이트 예정)
+                            // 불참 로직(Firestore 연동 예정)
                           },
                         ),
                       ],
                     ),
                     onTap: () {
-                      _openMap(event['location']);
+                      _openMap(event); // ✅ 지도 연동
                     },
                   ),
                 );
