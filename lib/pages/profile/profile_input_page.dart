@@ -4,7 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:path/path.dart' as p; // ✅ 확장자 추출용
+import 'package:path/path.dart' as p;
+
+import '../../widgets/custom_text_field.dart'; // 공통 텍스트필드
+import '../../widgets/primary_button.dart'; // 공통 버튼
 
 class ProfileInputPage extends StatefulWidget {
   final String uid; // 로그인한 사용자 UID
@@ -17,7 +20,6 @@ class ProfileInputPage extends StatefulWidget {
 class _ProfileInputPageState extends State<ProfileInputPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // 컨트롤러
   final _nameController = TextEditingController();
   final _uniformNameController = TextEditingController();
   final _numberController = TextEditingController();
@@ -28,7 +30,6 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
   String _department = '미정';
   bool _saving = false;
 
-  // 프로필 이미지
   File? _selectedImage;
   String? _currentPhotoUrl;
   final ImagePicker _picker = ImagePicker();
@@ -59,7 +60,6 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
     }
   }
 
-  /// 📌 이미지 선택
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
@@ -69,17 +69,24 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
     }
   }
 
-  /// 📌 Storage 업로드 후 URL 리턴
   Future<String?> _uploadProfileImage(String uid) async {
     if (_selectedImage == null) return null;
-    final ext = p.extension(_selectedImage!.path); // ✅ 확장자 유지
+    final ext = p.extension(_selectedImage!.path);
     final ref = FirebaseStorage.instance.ref().child('profile_images/$uid$ext');
     await ref.putFile(_selectedImage!);
     return await ref.getDownloadURL();
   }
 
   Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+    // ✅ TextFormField validator가 없으니 여기서 간단한 필수 체크 가능
+    if (_nameController.text.trim().isEmpty) {
+      _showSnack('본명을 입력해주세요.');
+      return;
+    }
+    if (_uniformNameController.text.trim().isEmpty) {
+      _showSnack('유니폼 이름을 입력해주세요.');
+      return;
+    }
 
     setState(() => _saving = true);
 
@@ -87,7 +94,7 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
       final number = int.tryParse(_numberController.text.trim()) ?? 0;
       final uniformName = _uniformNameController.text.trim();
 
-      // 등번호 중복 체크
+      // 🔹 등번호 중복 체크
       final numberQuery = await FirebaseFirestore.instance
           .collection('members')
           .where('number', isEqualTo: number)
@@ -98,7 +105,7 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
         return;
       }
 
-      // 유니폼 이름 중복 체크
+      // 🔹 유니폼 이름 중복 체크
       final uniformNameQuery = await FirebaseFirestore.instance
           .collection('members')
           .where('uniformName', isEqualTo: uniformName)
@@ -109,10 +116,8 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
         return;
       }
 
-      // 프로필 이미지 업로드
       final photoUrl = await _uploadProfileImage(widget.uid);
 
-      // Firestore 업데이트
       final updateData = {
         'name': _nameController.text.trim(),
         'uniformName': uniformName,
@@ -128,8 +133,8 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
           .collection('members')
           .doc(widget.uid)
           .update(updateData);
-      _showSnack('✅ 프로필이 수정되었습니다!');
 
+      _showSnack('✅ 프로필이 수정되었습니다!');
       if (mounted) Navigator.pop(context);
     } catch (e) {
       _showSnack('❌ 수정 실패: $e');
@@ -188,123 +193,66 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              _buildTextField(_nameController, '본명', validator: true),
+
+              // 🔹 공통 텍스트필드
+              CustomTextField(controller: _nameController, hintText: '본명'),
               const SizedBox(height: 16),
-              _buildTextField(
-                _uniformNameController,
-                '유니폼 이름',
-                validator: true,
+
+              CustomTextField(
+                controller: _uniformNameController,
+                hintText: '유니폼 이름',
               ),
               const SizedBox(height: 16),
-              _buildTextField(
-                _numberController,
-                '등번호',
+
+              CustomTextField(
+                controller: _numberController,
+                hintText: '등번호',
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
-              _buildPhoneField(),
+
+              CustomTextField(
+                controller: _phoneController,
+                hintText: '연락처 (숫자만 입력)',
+                keyboardType: TextInputType.number,
+              ),
               const SizedBox(height: 16),
-              _buildAddressField(_homeAddressController, '자택 주소', true),
+
+              CustomTextField(
+                controller: _homeAddressController,
+                hintText: '자택 주소 (구까지만)',
+              ),
               const SizedBox(height: 16),
-              _buildAddressField(_workAddressController, '직장 주소', false),
+
+              CustomTextField(
+                controller: _workAddressController,
+                hintText: '직장 주소 (구까지만)',
+              ),
               const SizedBox(height: 16),
-              _buildDropdown(),
+
+              DropdownButtonFormField<String>(
+                value: _department,
+                items: const [
+                  DropdownMenuItem(value: '운영팀', child: Text('운영팀')),
+                  DropdownMenuItem(value: '수업관리팀', child: Text('수업관리팀')),
+                  DropdownMenuItem(
+                    value: '경기관리/대외협력팀',
+                    child: Text('경기관리/대외협력팀'),
+                  ),
+                  DropdownMenuItem(value: '미정', child: Text('미정')),
+                ],
+                onChanged: (v) => setState(() => _department = v ?? '미정'),
+                decoration: const InputDecoration(labelText: '소속'),
+              ),
               const SizedBox(height: 24),
+
               _saving
                   ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _saveProfile,
-                      child: const Text('수정 완료'),
-                    ),
+                  : PrimaryButton(text: '수정 완료', onPressed: _saveProfile),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label, {
-    bool validator = false,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label),
-      validator: validator
-          ? (v) => (v == null || v.isEmpty) ? '$label 을(를) 입력하세요' : null
-          : null,
-    );
-  }
-
-  Widget _buildPhoneField() {
-    return TextFormField(
-      controller: _phoneController,
-      keyboardType: TextInputType.number,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        _PhoneNumberTextInputFormatter(),
-      ],
-      validator: (v) => (v == null || v.isEmpty) ? '연락처를 입력하세요' : null,
-      decoration: const InputDecoration(
-        labelText: '연락처',
-        helperText: '(숫자만 입력)',
-      ),
-    );
-  }
-
-  Widget _buildAddressField(
-    TextEditingController controller,
-    String label,
-    bool required,
-  ) {
-    return TextFormField(
-      controller: controller,
-      validator: (v) {
-        if (!required && (v == null || v.isEmpty)) return null;
-        if (v == null || v.isEmpty) return '$label을 입력해주세요';
-        final parts = v.trim().split(' ');
-        if (parts.length > 2) return '구까지만 입력해주세요 (예: 서울특별시 영등포구)';
-        return null;
-      },
-      decoration: InputDecoration(labelText: '$label (구까지만 입력)'),
-    );
-  }
-
-  Widget _buildDropdown() {
-    return DropdownButtonFormField<String>(
-      value: _department,
-      items: const [
-        DropdownMenuItem(value: '운영팀', child: Text('운영팀')),
-        DropdownMenuItem(value: '수업관리팀', child: Text('수업관리팀')),
-        DropdownMenuItem(value: '경기관리/대외협력팀', child: Text('경기관리/대외협력팀')),
-        DropdownMenuItem(value: '미정', child: Text('미정')),
-      ],
-      onChanged: (v) => setState(() => _department = v ?? '미정'),
-      decoration: const InputDecoration(labelText: '소속'),
-    );
-  }
-}
-
-/// 📌 전화번호 자동 하이픈 입력 Formatter
-class _PhoneNumberTextInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final buffer = StringBuffer();
-    for (int i = 0; i < digitsOnly.length && i < 11; i++) {
-      if (i == 3 || i == 7) buffer.write('-');
-      buffer.write(digitsOnly[i]);
-    }
-    final formatted = buffer.toString();
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

@@ -6,6 +6,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../../widgets/custom_text_field.dart'; // 공통 텍스트필드
+import '../../widgets/primary_button.dart'; // 공통 버튼
+
 class ProfileSetupPage extends StatefulWidget {
   const ProfileSetupPage({Key? key}) : super(key: key);
 
@@ -26,7 +29,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   String _department = '미정';
   bool _saving = false;
 
-  // ✅ 프로필 이미지 관련
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
 
@@ -53,9 +55,9 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인 상태가 아닙니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('로그인 상태가 아닙니다.')));
         setState(() => _saving = false);
         return;
       }
@@ -63,20 +65,19 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       final number = int.tryParse(_numberController.text.trim()) ?? 0;
       final uniformName = _uniformNameController.text.trim();
 
-      // 등번호 중복 체크
+      // ✅ 중복 체크
       final numberQuery = await FirebaseFirestore.instance
           .collection('members')
           .where('number', isEqualTo: number)
           .get();
       if (numberQuery.docs.any((doc) => doc.id != user.uid)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('등번호 $number 는 이미 사용 중입니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('등번호 $number 는 이미 사용 중입니다.')));
         setState(() => _saving = false);
         return;
       }
 
-      // 유니폼 이름 중복 체크
       final uniformNameQuery = await FirebaseFirestore.instance
           .collection('members')
           .where('uniformName', isEqualTo: uniformName)
@@ -89,10 +90,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         return;
       }
 
-      // ✅ 프로필 이미지 업로드
       final photoUrl = await _uploadProfileImage(user.uid);
 
-      // Firestore 저장
       await FirebaseFirestore.instance.collection('members').doc(user.uid).set({
         'memberId': user.uid,
         'name': _nameController.text.trim(),
@@ -108,15 +107,15 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         if (photoUrl != null) 'photoUrl': photoUrl,
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ 가입 완료!')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('✅ 가입 완료!')));
 
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ 저장 실패: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('❌ 저장 실패: $e')));
     } finally {
       setState(() => _saving = false);
     }
@@ -132,7 +131,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           key: _formKey,
           child: ListView(
             children: [
-              // ✅ 프로필 이미지 선택
               Center(
                 child: GestureDetector(
                   onTap: _pickImage,
@@ -140,8 +138,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                     radius: 50,
                     backgroundImage: _selectedImage != null
                         ? FileImage(_selectedImage!)
-                        : const AssetImage('assets/default_profile.png')
-                            as ImageProvider,
+                        : const AssetImage('assets/images/default_profile.png'),
                     child: Align(
                       alignment: Alignment.bottomRight,
                       child: CircleAvatar(
@@ -155,52 +152,32 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               ),
               const SizedBox(height: 24),
 
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: '본명'),
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? '본명을 입력하세요' : null,
-              ),
+              // ✅ 공통 UI 적용
+              CustomTextField(controller: _nameController, hintText: '본명'),
               const SizedBox(height: 16),
-              TextFormField(
+              CustomTextField(
                 controller: _uniformNameController,
-                decoration: const InputDecoration(labelText: '유니폼 이름'),
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? '유니폼 이름을 입력하세요' : null,
+                hintText: '유니폼 이름',
               ),
               const SizedBox(height: 16),
-              TextFormField(
+              CustomTextField(
                 controller: _numberController,
+                hintText: '등번호',
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '등번호'),
               ),
               const SizedBox(height: 16),
-              TextFormField(
+              CustomTextField(
                 controller: _phoneController,
+                hintText: '연락처 (숫자만 입력)',
                 keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  _PhoneNumberTextInputFormatter(),
-                ],
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? '연락처를 입력하세요' : null,
-                decoration: InputDecoration(
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Text('연락처'),
-                      SizedBox(width: 6),
-                      Text('(숫자만 입력)',
-                          style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    ],
-                  ),
-                ),
               ),
               const SizedBox(height: 16),
+
+              // ✅ 주소는 validator가 필요해서 TextFormField 유지
               TextFormField(
                 controller: _homeAddressController,
                 validator: (v) {
-                  if (v == null || v.isEmpty) return '주소를 입력해주세요';
+                  if (v == null || v.isEmpty) return '자택 주소를 입력해주세요';
                   final parts = v.trim().split(' ');
                   if (parts.length > 2) {
                     return '구까지만 입력해주세요 (예: 서울특별시 영등포구)';
@@ -223,26 +200,26 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 decoration: const InputDecoration(labelText: '직장 주소'),
               ),
               const SizedBox(height: 16),
+
               DropdownButtonFormField<String>(
                 value: _department,
                 items: const [
                   DropdownMenuItem(value: '운영팀', child: Text('운영팀')),
                   DropdownMenuItem(value: '수업관리팀', child: Text('수업관리팀')),
                   DropdownMenuItem(
-                      value: '경기관리/대외협력팀',
-                      child: Text('경기관리/대외협력팀')),
+                    value: '경기관리/대외협력팀',
+                    child: Text('경기관리/대외협력팀'),
+                  ),
                   DropdownMenuItem(value: '미정', child: Text('미정')),
                 ],
                 onChanged: (v) => setState(() => _department = v ?? '미정'),
                 decoration: const InputDecoration(labelText: '소속'),
               ),
               const SizedBox(height: 24),
+
               _saving
                   ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton(
-                      onPressed: _save,
-                      child: const Text('가입 완료'),
-                    ),
+                  : PrimaryButton(text: '가입 완료', onPressed: _save),
             ],
           ),
         ),
@@ -251,10 +228,13 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   }
 }
 
+/// 전화번호 자동 하이픈 입력 포맷터 (기존 유지)
 class _PhoneNumberTextInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     final digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
     final buffer = StringBuffer();
     for (int i = 0; i < digitsOnly.length && i < 11; i++) {
