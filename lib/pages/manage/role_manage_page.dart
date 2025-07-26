@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class RoleManagePage extends StatefulWidget {
   final String memberUid; // 역할을 변경할 멤버의 Firestore 문서 ID
-  const RoleManagePage({Key? key, required this.memberUid}) : super(key: key);
+  const RoleManagePage({super.key, required this.memberUid});
 
   @override
   State<RoleManagePage> createState() => _RoleManagePageState();

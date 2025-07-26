@@ -30,12 +30,19 @@ class ScheduleDetailPage extends StatelessWidget {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
+
+          // attendees, comments 안전한 변환
           final attendees = List<Map<String, dynamic>>.from(
-            data['attendees'] ?? [],
+            (data['attendees'] ?? []) as List,
           );
           final comments = List<Map<String, dynamic>>.from(
-            data['comments'] ?? [],
+            (data['comments'] ?? []) as List,
           );
+
+          // date와 time도 null-safe 처리
+          final dateStr = data['date']?.toString() ?? '';
+          final timeStr = data['time']?.toString() ?? '';
+          final locationStr = data['location']?.toString() ?? '';
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -44,7 +51,7 @@ class ScheduleDetailPage extends StatelessWidget {
               children: [
                 // 🏷 기본 정보
                 Text(
-                  '${data['date']} ${data['time']}',
+                  '$dateStr $timeStr',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -55,7 +62,7 @@ class ScheduleDetailPage extends StatelessWidget {
                   children: [
                     const Icon(Icons.place, color: Colors.red),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(data['location'] ?? '')),
+                    Expanded(child: Text(locationStr)),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -78,18 +85,22 @@ class ScheduleDetailPage extends StatelessWidget {
                     itemCount: attendees.length,
                     itemBuilder: (context, index) {
                       final a = attendees[index];
+                      final status = a['status']?.toString() ?? '';
+                      final userId = a['userId']?.toString() ?? '알 수 없음';
+                      final reason = a['reason']?.toString();
+
                       return ListTile(
                         leading: Icon(
-                          a['status'] == 'attending'
+                          status == 'attending'
                               ? Icons.check_circle
                               : Icons.cancel,
-                          color: a['status'] == 'attending'
+                          color: status == 'attending'
                               ? Colors.green
                               : Colors.red,
                         ),
-                        title: Text(a['userId'] ?? '알 수 없음'),
-                        subtitle: a['reason'] != null && a['reason']!.isNotEmpty
-                            ? Text('사유: ${a['reason']}')
+                        title: Text(userId),
+                        subtitle: (reason != null && reason.isNotEmpty)
+                            ? Text('사유: $reason')
                             : null,
                       );
                     },
@@ -114,10 +125,12 @@ class ScheduleDetailPage extends StatelessWidget {
                     itemCount: comments.length,
                     itemBuilder: (context, index) {
                       final c = comments[index];
+                      final text = c['text']?.toString() ?? '';
+                      final userId = c['userId']?.toString() ?? '';
                       return ListTile(
                         leading: const Icon(Icons.comment, color: Colors.blue),
-                        title: Text(c['text'] ?? ''),
-                        subtitle: Text(c['userId'] ?? ''),
+                        title: Text(text),
+                        subtitle: Text(userId),
                       );
                     },
                   ),

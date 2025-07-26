@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../models/schedule_event_model.dart';
-import '../pages/schedule/schedule_detail_page.dart'; // 상세 페이지 이동하려면 import 추가
+import '../../../models/schedule_event_model.dart';
+import '../schedule_detail_page.dart';
 
 class EventCard extends StatelessWidget {
   final ScheduleEvent event;
@@ -17,7 +17,8 @@ class EventCard extends StatelessWidget {
 
   /// ✅ 지도 열기 함수
   Future<void> _openMap(BuildContext context, String? location) async {
-    if (location == null || location.trim().isEmpty) {
+    final safeLocation = location?.trim() ?? '';
+    if (safeLocation.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('장소 정보가 없습니다.')));
@@ -25,7 +26,7 @@ class EventCard extends StatelessWidget {
     }
 
     // 네이버 지도 웹 검색 URL
-    final encodedLocation = Uri.encodeComponent(location);
+    final encodedLocation = Uri.encodeComponent(safeLocation);
     final url = Uri.parse('https://map.naver.com/p/$encodedLocation');
 
     if (await canLaunchUrl(url)) {
@@ -33,12 +34,14 @@ class EventCard extends StatelessWidget {
     } else {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('지도를 열 수 없습니다: $location')));
+      ).showSnackBar(SnackBar(content: Text('지도를 열 수 없습니다: $safeLocation')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final safeLocation = event.location ?? '';
+
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -48,7 +51,7 @@ class EventCard extends StatelessWidget {
           color: event.type == 'lesson' ? Colors.blue : Colors.green,
         ),
         title: Text(
-          '${event.time} @ ${event.location}',
+          '${event.time ?? ''} @ $safeLocation',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text('참석자: ${event.attendees.length}'),
@@ -67,7 +70,7 @@ class EventCard extends StatelessWidget {
             ),
             IconButton(
               icon: const Icon(Icons.map, color: Colors.blueGrey),
-              onPressed: () => _openMap(context, event.location),
+              onPressed: () => _openMap(context, safeLocation), // ✅ null 방지
               tooltip: '지도 열기',
             ),
           ],

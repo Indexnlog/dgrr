@@ -5,12 +5,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart' as p;
 
-import '../../widgets/custom_text_field.dart'; // 공통 텍스트필드
-import '../../widgets/primary_button.dart'; // 공통 버튼
+import '../../widgets/custom_text_field.dart'; // ✅ 공통 텍스트필드
+import '../../widgets/primary_button.dart'; // ✅ 공통 버튼
 
 class ProfileSetupPage extends StatefulWidget {
-  const ProfileSetupPage({Key? key}) : super(key: key);
+  const ProfileSetupPage({super.key});
 
   @override
   State<ProfileSetupPage> createState() => _ProfileSetupPageState();
@@ -43,7 +44,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   Future<String?> _uploadProfileImage(String uid) async {
     if (_selectedImage == null) return null;
-    final ref = FirebaseStorage.instance.ref().child('profile_images/$uid.jpg');
+    final ext = p.extension(_selectedImage!.path);
+    final ref = FirebaseStorage.instance.ref().child('profile_images/$uid$ext');
     await ref.putFile(_selectedImage!);
     return await ref.getDownloadURL();
   }
@@ -65,15 +67,13 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       final number = int.tryParse(_numberController.text.trim()) ?? 0;
       final uniformName = _uniformNameController.text.trim();
 
-      // ✅ 중복 체크
+      // 중복 체크
       final numberQuery = await FirebaseFirestore.instance
           .collection('members')
           .where('number', isEqualTo: number)
           .get();
       if (numberQuery.docs.any((doc) => doc.id != user.uid)) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('등번호 $number 는 이미 사용 중입니다.')));
+        _showSnack('등번호 $number 는 이미 사용 중입니다.');
         setState(() => _saving = false);
         return;
       }
@@ -83,9 +83,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           .where('uniformName', isEqualTo: uniformName)
           .get();
       if (uniformNameQuery.docs.any((doc) => doc.id != user.uid)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('유니폼 이름 "$uniformName" 은 이미 사용 중입니다.')),
-        );
+        _showSnack('유니폼 이름 "$uniformName" 은 이미 사용 중입니다.');
         setState(() => _saving = false);
         return;
       }
@@ -107,18 +105,19 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         if (photoUrl != null) 'photoUrl': photoUrl,
       });
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('✅ 가입 완료!')));
-
+      _showSnack('✅ 가입 완료!');
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('❌ 저장 실패: $e')));
+      _showSnack('❌ 저장 실패: $e');
     } finally {
       setState(() => _saving = false);
     }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -131,73 +130,69 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           key: _formKey,
           child: ListView(
             children: [
+              // 프로필 이미지
               Center(
                 child: GestureDetector(
                   onTap: _pickImage,
                   child: CircleAvatar(
                     radius: 50,
+                    backgroundColor: Colors.grey[300],
                     backgroundImage: _selectedImage != null
                         ? FileImage(_selectedImage!)
                         : const AssetImage('assets/images/default_profile.png'),
-                    child: Align(
-                      alignment: Alignment.bottomRight,
-                      child: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Colors.white,
-                        child: const Icon(Icons.camera_alt, size: 18),
-                      ),
-                    ),
+                    child: (_selectedImage == null)
+                        ? const Icon(
+                            Icons.camera_alt,
+                            size: 32,
+                            color: Colors.white,
+                          )
+                        : null,
                   ),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // ✅ 공통 UI 적용
-              CustomTextField(controller: _nameController, hintText: '본명'),
+              // 공통 텍스트필드 적용
+              CustomTextField(
+                controller: _nameController,
+                hintText: '본명',
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? '본명을 입력해주세요' : null,
+              ),
               const SizedBox(height: 16),
+
               CustomTextField(
                 controller: _uniformNameController,
                 hintText: '유니폼 이름',
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? '유니폼 이름을 입력해주세요' : null,
               ),
               const SizedBox(height: 16),
+
               CustomTextField(
                 controller: _numberController,
                 hintText: '등번호',
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
+
               CustomTextField(
                 controller: _phoneController,
                 hintText: '연락처 (숫자만 입력)',
                 keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
               const SizedBox(height: 16),
 
-              // ✅ 주소는 validator가 필요해서 TextFormField 유지
-              TextFormField(
+              CustomTextField(
                 controller: _homeAddressController,
-                validator: (v) {
-                  if (v == null || v.isEmpty) return '자택 주소를 입력해주세요';
-                  final parts = v.trim().split(' ');
-                  if (parts.length > 2) {
-                    return '구까지만 입력해주세요 (예: 서울특별시 영등포구)';
-                  }
-                  return null;
-                },
-                decoration: const InputDecoration(labelText: '자택 주소'),
+                hintText: '자택 주소 (구까지만)',
               ),
               const SizedBox(height: 16),
-              TextFormField(
+
+              CustomTextField(
                 controller: _workAddressController,
-                validator: (v) {
-                  if (v == null || v.isEmpty) return null;
-                  final parts = v.trim().split(' ');
-                  if (parts.length > 2) {
-                    return '구까지만 입력해주세요 (예: 서울특별시 영등포구)';
-                  }
-                  return null;
-                },
-                decoration: const InputDecoration(labelText: '직장 주소'),
+                hintText: '직장 주소 (구까지만)',
               ),
               const SizedBox(height: 16),
 
@@ -224,27 +219,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// 전화번호 자동 하이픈 입력 포맷터 (기존 유지)
-class _PhoneNumberTextInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final buffer = StringBuffer();
-    for (int i = 0; i < digitsOnly.length && i < 11; i++) {
-      if (i == 3 || i == 7) buffer.write('-');
-      buffer.write(digitsOnly[i]);
-    }
-    final formatted = buffer.toString();
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

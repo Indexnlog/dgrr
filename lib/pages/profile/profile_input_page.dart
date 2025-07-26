@@ -10,8 +10,8 @@ import '../../widgets/custom_text_field.dart'; // 공통 텍스트필드
 import '../../widgets/primary_button.dart'; // 공통 버튼
 
 class ProfileInputPage extends StatefulWidget {
-  final String uid; // 로그인한 사용자 UID
-  const ProfileInputPage({Key? key, required this.uid}) : super(key: key);
+  final String uid;
+  const ProfileInputPage({super.key, required this.uid});
 
   @override
   State<ProfileInputPage> createState() => _ProfileInputPageState();
@@ -78,15 +78,8 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
   }
 
   Future<void> _saveProfile() async {
-    // ✅ TextFormField validator가 없으니 여기서 간단한 필수 체크 가능
-    if (_nameController.text.trim().isEmpty) {
-      _showSnack('본명을 입력해주세요.');
-      return;
-    }
-    if (_uniformNameController.text.trim().isEmpty) {
-      _showSnack('유니폼 이름을 입력해주세요.');
-      return;
-    }
+    // ✅ TextFormField의 validator가 동작하도록 validate 호출
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
 
@@ -170,6 +163,7 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
           key: _formKey,
           child: ListView(
             children: [
+              // ✅ 프로필 이미지
               Center(
                 child: GestureDetector(
                   onTap: _pickImage,
@@ -194,13 +188,20 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
               ),
               const SizedBox(height: 24),
 
-              // 🔹 공통 텍스트필드
-              CustomTextField(controller: _nameController, hintText: '본명'),
+              // ✅ 공통 텍스트필드 + validator 적용
+              CustomTextField(
+                controller: _nameController,
+                hintText: '본명',
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? '본명을 입력해주세요' : null,
+              ),
               const SizedBox(height: 16),
 
               CustomTextField(
                 controller: _uniformNameController,
                 hintText: '유니폼 이름',
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? '유니폼 이름을 입력해주세요' : null,
               ),
               const SizedBox(height: 16),
 
@@ -215,6 +216,12 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
                 controller: _phoneController,
                 hintText: '연락처 (숫자만 입력)',
                 keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  _PhoneNumberTextInputFormatter(),
+                ],
+                validator: (v) =>
+                    (v == null || v.isEmpty) ? '연락처를 입력해주세요' : null,
               ),
               const SizedBox(height: 16),
 
@@ -253,6 +260,27 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// ✅ 전화번호 자동 하이픈 Formatter
+class _PhoneNumberTextInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digitsOnly = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < digitsOnly.length && i < 11; i++) {
+      if (i == 3 || i == 7) buffer.write('-');
+      buffer.write(digitsOnly[i]);
+    }
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

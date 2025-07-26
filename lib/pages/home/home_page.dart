@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +85,7 @@ class HomePage extends StatelessWidget {
             // ✅ 출석 현황
             Text('이번 달 출석 현황', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text('수업 ${classCount}회 / 매치 ${matchCount}회'),
+            Text('수업 $classCount회 / 매치 $matchCount회'),
             const SizedBox(height: 24),
 
             // 📅 다가오는 일정
@@ -114,7 +114,7 @@ class HomePage extends StatelessWidget {
                   },
                 ),
               );
-            }).toList(),
+            }),
             const SizedBox(height: 24),
 
             // 📢 공지
@@ -128,7 +128,7 @@ class HomePage extends StatelessWidget {
                   // 👉 공지 상세 보기 로직
                 },
               );
-            }).toList(),
+            }),
             const SizedBox(height: 24),
 
             // 🔗 빠른 액션 버튼
