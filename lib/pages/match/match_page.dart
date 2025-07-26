@@ -10,20 +10,22 @@ class MatchPage extends StatelessWidget {
 
   // HEX -> Color 변환
   Color _hexToColor(String? hex) {
-    if (hex == null || hex.isEmpty) return Colors.grey.shade300;
-    final buffer = StringBuffer();
-    if (hex.length == 6 || hex.length == 7) buffer.write('ff');
-    buffer.write(hex.replaceFirst('#', ''));
-    return Color(int.parse(buffer.toString(), radix: 16));
+    try {
+      if (hex == null || hex.isEmpty) return Colors.grey.shade300;
+      final buffer = StringBuffer();
+      if (hex.length == 6 || hex.length == 7) buffer.write('ff');
+      buffer.write(hex.replaceFirst('#', ''));
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (e) {
+      debugPrint('색상 변환 오류: $e');
+      return Colors.grey.shade300;
+    }
   }
 
   // 네이버 지도 딥링크 열기
   Future<void> _openMap(String location) async {
     final encodedLocation = Uri.encodeComponent(location);
-
-    // 네이버 지도 앱 스킴
     final naverMapUrl = Uri.parse('nmap://search?query=$encodedLocation');
-    // 웹 브라우저 fallback
     final webUrl = Uri.parse(
       'https://map.naver.com/v5/search/$encodedLocation',
     );
@@ -87,14 +89,32 @@ class MatchPage extends StatelessWidget {
                   .difference(DateTime(now.year, now.month, now.day))
                   .inDays;
 
+              // 팀 정보 가져오기
+              if (match.teamId == null || match.teamId!.isEmpty) {
+                // teamId가 없는 경우 기본 카드로 바로 표시
+                return _buildMatchCard(
+                  context: context,
+                  match: match,
+                  dDay: dDay,
+                  teamName: match.teamName ?? '상대팀 미지정',
+                  teamColor: Colors.grey.shade300,
+                  logoUrl: null,
+                );
+              }
+
               return FutureBuilder<DocumentSnapshot>(
-                future: match.teamId != null
-                    ? FirebaseFirestore.instance
-                          .collection('teams')
-                          .doc(match.teamId)
-                          .get()
-                    : null,
+                future: FirebaseFirestore.instance
+                    .collection('teams')
+                    .doc(match.teamId)
+                    .get(),
                 builder: (ctx, teamSnap) {
+                  if (teamSnap.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: LinearProgressIndicator(),
+                    );
+                  }
+
                   String? logoUrl;
                   String? teamName = match.teamName;
                   Color teamColor = Colors.grey.shade300;
@@ -107,79 +127,90 @@ class MatchPage extends StatelessWidget {
                     teamColor = _hexToColor(teamData['teamColor']);
                   }
 
-                  return Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: teamColor, width: 2),
-                    ),
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    child: ListTile(
-                      leading: (logoUrl != null && logoUrl.isNotEmpty)
-                          ? CircleAvatar(
-                              backgroundImage: NetworkImage(logoUrl),
-                              backgroundColor: teamColor.withOpacity(0.2),
-                            )
-                          : CircleAvatar(
-                              backgroundColor: teamColor,
-                              child: const Icon(
-                                Icons.sports_soccer,
-                                color: Colors.white,
-                              ),
-                            ),
-                      title: GestureDetector(
-                        onTap: () {
-                          if (match.location != null &&
-                              match.location!.isNotEmpty) {
-                            _openMap(match.location!);
-                          }
-                        },
-                        child: Text(
-                          '${match.time ?? ''} @ ${match.location ?? ''}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('상대팀: $teamName'),
-                          Text('점수: ${match.score.home} - ${match.score.away}'),
-                          Text(
-                            dDay == 0
-                                ? 'D-Day'
-                                : dDay > 0
-                                ? 'D-$dDay'
-                                : 'D+${-dDay}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: dDay == 0
-                                  ? Colors.red
-                                  : (dDay > 0 && dDay <= 3)
-                                  ? Colors.orange
-                                  : Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                      // ✅ 상세 페이지로 이동
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MatchDetailPage(event: match),
-                          ),
-                        );
-                      },
-                    ),
+                  return _buildMatchCard(
+                    context: context,
+                    match: match,
+                    dDay: dDay,
+                    teamName: teamName ?? '상대팀',
+                    teamColor: teamColor,
+                    logoUrl: logoUrl,
                   );
                 },
               );
             },
+          );
+        },
+      ),
+    );
+  }
+
+  /// 매치 카드 빌드
+  Widget _buildMatchCard({
+    required BuildContext context,
+    required MatchEvent match,
+    required int dDay,
+    required String teamName,
+    required Color teamColor,
+    String? logoUrl,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: teamColor, width: 2),
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: ListTile(
+        leading: (logoUrl != null && logoUrl.isNotEmpty)
+            ? CircleAvatar(
+                backgroundImage: NetworkImage(logoUrl),
+                backgroundColor: teamColor.withOpacity(0.2),
+              )
+            : CircleAvatar(
+                backgroundColor: teamColor,
+                child: const Icon(Icons.sports_soccer, color: Colors.white),
+              ),
+        title: InkWell(
+          onTap: () {
+            if (match.location != null && match.location!.isNotEmpty) {
+              _openMap(match.location!);
+            }
+          },
+          child: Text(
+            '${match.time ?? ''} @ ${match.location ?? ''}',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('상대팀: $teamName'),
+            Text('점수: ${match.score.home} - ${match.score.away}'),
+            Text(
+              dDay == 0
+                  ? 'D-Day'
+                  : dDay > 0
+                  ? 'D-$dDay'
+                  : 'D+${-dDay}',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: dDay == 0
+                    ? Colors.red
+                    : (dDay > 0 && dDay <= 3)
+                    ? Colors.orange
+                    : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MatchDetailPage(event: match),
+            ),
           );
         },
       ),
