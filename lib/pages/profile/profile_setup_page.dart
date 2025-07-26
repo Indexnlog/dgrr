@@ -33,6 +33,10 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
 
+  // ✅ 입단일 선택용 변수
+  DateTime? _selectedJoinDate;
+
+  // 이미지 선택
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
@@ -42,6 +46,20 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     }
   }
 
+  // 입단일 선택
+  Future<void> _pickJoinDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedJoinDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() => _selectedJoinDate = picked);
+    }
+  }
+
+  // 프로필 이미지 업로드
   Future<String?> _uploadProfileImage(String uid) async {
     if (_selectedImage == null) return null;
     final ext = p.extension(_selectedImage!.path);
@@ -52,6 +70,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedJoinDate == null) {
+      _showSnack('입단일을 선택해주세요.');
+      return;
+    }
+
     setState(() => _saving = true);
 
     try {
@@ -67,7 +90,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       final number = int.tryParse(_numberController.text.trim()) ?? 0;
       final uniformName = _uniformNameController.text.trim();
 
-      // 중복 체크
+      // 🔹 등번호 중복 체크
       final numberQuery = await FirebaseFirestore.instance
           .collection('members')
           .where('number', isEqualTo: number)
@@ -78,6 +101,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         return;
       }
 
+      // 🔹 유니폼 이름 중복 체크
       final uniformNameQuery = await FirebaseFirestore.instance
           .collection('members')
           .where('uniformName', isEqualTo: uniformName)
@@ -100,8 +124,8 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         'workAddress': _workAddressController.text.trim(),
         'department': _department,
         'role': '일반회원',
-        'joinedAt': FieldValue.serverTimestamp(),
         'status': 'pending',
+        'joinDate': Timestamp.fromDate(_selectedJoinDate!), // ✅ 직접 입력한 입단일
         if (photoUrl != null) 'photoUrl': photoUrl,
       });
 
@@ -130,7 +154,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
           key: _formKey,
           child: ListView(
             children: [
-              // 프로필 이미지
+              // ✅ 프로필 이미지
               Center(
                 child: GestureDetector(
                   onTap: _pickImage,
@@ -152,7 +176,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               ),
               const SizedBox(height: 24),
 
-              // 공통 텍스트필드 적용
+              // ✅ 이름
               CustomTextField(
                 controller: _nameController,
                 hintText: '본명',
@@ -161,6 +185,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               ),
               const SizedBox(height: 16),
 
+              // ✅ 유니폼 이름
               CustomTextField(
                 controller: _uniformNameController,
                 hintText: '유니폼 이름',
@@ -169,6 +194,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               ),
               const SizedBox(height: 16),
 
+              // ✅ 등번호
               CustomTextField(
                 controller: _numberController,
                 hintText: '등번호',
@@ -176,6 +202,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               ),
               const SizedBox(height: 16),
 
+              // ✅ 연락처
               CustomTextField(
                 controller: _phoneController,
                 hintText: '연락처 (숫자만 입력)',
@@ -184,18 +211,21 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               ),
               const SizedBox(height: 16),
 
+              // ✅ 자택 주소
               CustomTextField(
                 controller: _homeAddressController,
                 hintText: '자택 주소 (구까지만)',
               ),
               const SizedBox(height: 16),
 
+              // ✅ 직장 주소
               CustomTextField(
                 controller: _workAddressController,
                 hintText: '직장 주소 (구까지만)',
               ),
               const SizedBox(height: 16),
 
+              // ✅ 소속
               DropdownButtonFormField<String>(
                 value: _department,
                 items: const [
@@ -209,6 +239,22 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                 ],
                 onChanged: (v) => setState(() => _department = v ?? '미정'),
                 decoration: const InputDecoration(labelText: '소속'),
+              ),
+              const SizedBox(height: 16),
+
+              // ✅ 입단일 선택
+              ListTile(
+                tileColor: Colors.grey[100],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                title: Text(
+                  _selectedJoinDate != null
+                      ? '${_selectedJoinDate!.year}-${_selectedJoinDate!.month.toString().padLeft(2, '0')}-${_selectedJoinDate!.day.toString().padLeft(2, '0')}'
+                      : '입단일을 선택하세요',
+                ),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: _pickJoinDate,
               ),
               const SizedBox(height: 24),
 

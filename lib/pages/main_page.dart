@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'home/home_page.dart';
 import 'schedule/schedule_page.dart';
 import 'match/match_page.dart';
-import 'profile/profile_page.dart';
+// import 'profile/profile_page.dart';  // ❌ 기존 프로필 페이지는 주석 처리
+import 'my/my_page.dart'; // ✅ MyPage로 교체
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -21,7 +22,7 @@ class _MainPageState extends State<MainPage> {
     HomePage(),
     SchedulePage(), // 일정 탭
     MatchPage(), // 매치 탭
-    ProfilePage(),
+    MyPage(), // ✅ My 탭으로 교체
   ];
 
   void _onItemTapped(int index) {
@@ -49,7 +50,10 @@ class _MainPageState extends State<MainPage> {
             label: '일정',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.sports_soccer), label: '매치'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: '개인'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'My', // ✅ 라벨 변경
+          ),
         ],
       ),
     );

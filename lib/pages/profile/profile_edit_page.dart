@@ -9,15 +9,15 @@ import 'package:path/path.dart' as p;
 import '../../widgets/custom_text_field.dart'; // 공통 텍스트필드
 import '../../widgets/primary_button.dart'; // 공통 버튼
 
-class ProfileInputPage extends StatefulWidget {
+class ProfileEditPage extends StatefulWidget {
   final String uid;
-  const ProfileInputPage({super.key, required this.uid});
+  const ProfileEditPage({super.key, required this.uid});
 
   @override
-  State<ProfileInputPage> createState() => _ProfileInputPageState();
+  State<ProfileEditPage> createState() => _ProfileEditPageState();
 }
 
-class _ProfileInputPageState extends State<ProfileInputPage> {
+class _ProfileEditPageState extends State<ProfileEditPage> {
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
@@ -33,6 +33,9 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
   File? _selectedImage;
   String? _currentPhotoUrl;
   final ImagePicker _picker = ImagePicker();
+
+  // ✅ 입단일 변수
+  DateTime? _selectedJoinDate;
 
   @override
   void initState() {
@@ -56,6 +59,9 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
         _workAddressController.text = data['workAddress'] ?? '';
         _department = data['department'] ?? '미정';
         _currentPhotoUrl = data['photoUrl'];
+        if (data['joinDate'] != null) {
+          _selectedJoinDate = (data['joinDate'] as Timestamp).toDate();
+        }
       });
     }
   }
@@ -69,6 +75,18 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
     }
   }
 
+  Future<void> _pickJoinDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedJoinDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() => _selectedJoinDate = picked);
+    }
+  }
+
   Future<String?> _uploadProfileImage(String uid) async {
     if (_selectedImage == null) return null;
     final ext = p.extension(_selectedImage!.path);
@@ -78,8 +96,11 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
   }
 
   Future<void> _saveProfile() async {
-    // ✅ TextFormField의 validator가 동작하도록 validate 호출
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedJoinDate == null) {
+      _showSnack('입단일을 선택해주세요.');
+      return;
+    }
 
     setState(() => _saving = true);
 
@@ -119,6 +140,7 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
         'homeAddress': _homeAddressController.text.trim(),
         'workAddress': _workAddressController.text.trim(),
         'department': _department,
+        'joinDate': Timestamp.fromDate(_selectedJoinDate!), // ✅ 수정된 입단일
       };
       if (photoUrl != null) updateData['photoUrl'] = photoUrl;
 
@@ -188,7 +210,6 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
               ),
               const SizedBox(height: 24),
 
-              // ✅ 공통 텍스트필드 + validator 적용
               CustomTextField(
                 controller: _nameController,
                 hintText: '본명',
@@ -250,6 +271,22 @@ class _ProfileInputPageState extends State<ProfileInputPage> {
                 ],
                 onChanged: (v) => setState(() => _department = v ?? '미정'),
                 decoration: const InputDecoration(labelText: '소속'),
+              ),
+              const SizedBox(height: 16),
+
+              // ✅ 입단일 선택
+              ListTile(
+                tileColor: Colors.grey[100],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                title: Text(
+                  _selectedJoinDate != null
+                      ? '${_selectedJoinDate!.year}-${_selectedJoinDate!.month.toString().padLeft(2, '0')}-${_selectedJoinDate!.day.toString().padLeft(2, '0')}'
+                      : '입단일을 선택하세요',
+                ),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: _pickJoinDate,
               ),
               const SizedBox(height: 24),
 

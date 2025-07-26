@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/match_event_model.dart';
 import 'match_detail_page.dart';
-import '../manage/team_page.dart';
+import '../teams/team_page.dart';
 
 class MatchPage extends StatelessWidget {
   const MatchPage({super.key});
