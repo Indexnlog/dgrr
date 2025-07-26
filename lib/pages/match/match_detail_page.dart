@@ -1,255 +1,169 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/match_event_model.dart';
-import '../../services/firestore/match_service.dart';
+import 'match_detail_page.dart'; // 상세 페이지 import
 
-import 'widgets/record_goal_modal.dart';
-import 'widgets/record_change_modal.dart';
-import 'widgets/record_edit_modal.dart';
-import 'widgets/record_tile.dart';
+class MatchPage extends StatelessWidget {
+  const MatchPage({super.key});
 
-class MatchDetailPage extends StatefulWidget {
-  final MatchEvent event;
-  const MatchDetailPage({super.key, required this.event});
-
-  @override
-  State<MatchDetailPage> createState() => _MatchDetailPageState();
-}
-
-class _MatchDetailPageState extends State<MatchDetailPage> {
-  late final MatchService _matchService;
-  Map<String, String> displayMap = {}; // userId → '7번 길동'
-
-  @override
-  void initState() {
-    super.initState();
-    _matchService = MatchService(widget.event.id);
-    _loadMemberDisplayMap();
+  // HEX -> Color 변환
+  Color _hexToColor(String? hex) {
+    if (hex == null || hex.isEmpty) return Colors.grey.shade300;
+    final buffer = StringBuffer();
+    if (hex.length == 6 || hex.length == 7) buffer.write('ff');
+    buffer.write(hex.replaceFirst('#', ''));
+    return Color(int.parse(buffer.toString(), radix: 16));
   }
 
-  Future<void> _loadMemberDisplayMap() async {
-    final matchDoc = await FirebaseFirestore.instance
-        .collection('matches')
-        .doc(widget.event.id)
-        .get();
-    final matchData = matchDoc.data() as Map<String, dynamic>?;
-    if (matchData == null) return;
+  // 네이버 지도 딥링크 열기
+  Future<void> _openMap(String location) async {
+    final encodedLocation = Uri.encodeComponent(location);
 
-    final participants = (matchData['participants'] as List?) ?? [];
-    final attendingIds = participants
-        .where((p) => p is Map && p['status'] == 'attending')
-        .map((p) => (p as Map)['userId'] as String)
-        .toList();
+    // 네이버 지도 앱 스킴
+    final naverMapUrl = Uri.parse('nmap://search?query=$encodedLocation');
+    // 웹 브라우저 fallback
+    final webUrl = Uri.parse(
+      'https://map.naver.com/v5/search/$encodedLocation',
+    );
 
-    if (attendingIds.isEmpty) return;
-
-    final Map<String, String> temp = {};
-    for (var i = 0; i < attendingIds.length; i += 10) {
-      final chunk = attendingIds.sublist(
-        i,
-        i + 10 > attendingIds.length ? attendingIds.length : i + 10,
-      );
-      final memberSnap = await FirebaseFirestore.instance
-          .collection('members')
-          .where(FieldPath.documentId, whereIn: chunk)
-          .get();
-      for (var doc in memberSnap.docs) {
-        final num = doc['number']?.toString() ?? '';
-        final uniform = doc['uniformName'] ?? doc['name'] ?? doc.id;
-        temp[doc.id] = '${num}번 $uniform';
-      }
+    if (await canLaunchUrl(naverMapUrl)) {
+      await launchUrl(naverMapUrl, mode: LaunchMode.externalApplication);
+    } else if (await canLaunchUrl(webUrl)) {
+      await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+    } else {
+      debugPrint('지도를 열 수 없습니다.');
     }
-
-    if (mounted) {
-      setState(() {
-        displayMap = temp;
-      });
-    }
-  }
-
-  int _calcOffset(Timestamp? startTime) {
-    if (startTime == null) return 0;
-    return DateTime.now().difference(startTime.toDate()).inMinutes;
-  }
-
-  void _openGoalModal(List<String> players, Timestamp? startTime) {
-    showGoalModal(
-      context,
-      RecordGoalModal(
-        players: players,
-        displayMap: displayMap,
-        onSave: (playerId, memo) async {
-          await _matchService.addGoalRecord(
-            playerId,
-            memo,
-            _calcOffset(startTime),
-          );
-        },
-      ),
-    );
-  }
-
-  void _openChangeModal(List<String> players, Timestamp? startTime) {
-    showChangeModal(
-      context,
-      RecordChangeModal(
-        players: players,
-        displayMap: displayMap,
-        onSave: (outId, inId, memo) async {
-          await _matchService.addChangeRecord(
-            outId,
-            inId,
-            memo,
-            _calcOffset(startTime),
-          );
-        },
-      ),
-    );
-  }
-
-  void _openEditModal(
-    Map<String, dynamic> record,
-    String recordId,
-    List<String> players,
-  ) {
-    showEditModal(
-      context,
-      RecordEditModal(
-        displayMap: displayMap,
-        players: players,
-        record: record,
-        onSave: ({newPlayer, newOut, newIn, required newMemo}) async {
-          final ref = FirebaseFirestore.instance
-              .collection('matches')
-              .doc(widget.event.id)
-              .collection('records')
-              .doc(recordId);
-
-          if (record['type'] == 'goal') {
-            await ref.update({
-              'playerName': newPlayer ?? record['playerName'],
-              'memo': newMemo,
-            });
-          } else if (record['type'] == 'change') {
-            await ref.update({
-              'outPlayerName': newOut ?? record['outPlayerName'],
-              'inPlayerName': newIn ?? record['inPlayerName'],
-              'memo': newMemo,
-            });
-          }
-        },
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.event.teamName} 상세')),
-      body: StreamBuilder<DocumentSnapshot>(
+      appBar: AppBar(title: const Text('⚽ 매치')),
+      body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('matches')
-            .doc(widget.event.id)
+            .where('status', isEqualTo: 'confirmed')
+            .orderBy('date', descending: false)
             .snapshots(),
-        builder: (context, snap) {
-          if (!snap.hasData) {
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final data = snap.data!.data() as Map<String, dynamic>? ?? {};
-          final participants = (data['participants'] as List?) ?? [];
-          final gameStatus = data['gameStatus'] ?? 'notStarted';
-          final startTime = data['startTime'] as Timestamp?;
-          final attendingPlayers = participants
-              .where((p) => p is Map && p['status'] == 'attending')
-              .map((p) => (p as Map)['userId'] as String)
-              .toList();
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text('등록된 매치가 없습니다.'));
+          }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '경기 상태: $gameStatus',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    if (gameStatus == 'notStarted')
-                      FilledButton.icon(
-                        onPressed: () =>
-                            _matchService.updateGameStatus('inProgress'),
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('경기 시작'),
-                      ),
-                    if (gameStatus == 'inProgress')
-                      FilledButton.icon(
-                        onPressed: () =>
-                            _matchService.updateGameStatus('finished'),
-                        icon: const Icon(Icons.flag),
-                        label: const Text('경기 종료'),
-                      ),
-                  ],
-                ),
-                const Divider(height: 32),
-                Row(
-                  children: [
-                    ElevatedButton(
-                      onPressed: () =>
-                          _openGoalModal(attendingPlayers, startTime),
-                      child: const Text('⚽ 득점 기록'),
+          final matches = snapshot.data!.docs.map((doc) {
+            return MatchEvent.fromMap(
+              doc.data() as Map<String, dynamic>,
+              doc.id,
+            );
+          }).toList();
+
+          return ListView.builder(
+            itemCount: matches.length,
+            itemBuilder: (context, index) {
+              final match = matches[index];
+              final now = DateTime.now();
+              final matchDate = match.date;
+              final dDay = matchDate
+                  .difference(DateTime(now.year, now.month, now.day))
+                  .inDays;
+
+              return FutureBuilder<DocumentSnapshot>(
+                future: match.teamId != null
+                    ? FirebaseFirestore.instance
+                          .collection('teams')
+                          .doc(match.teamId)
+                          .get()
+                    : null,
+                builder: (ctx, teamSnap) {
+                  String? logoUrl;
+                  String? teamName = match.teamName;
+                  Color teamColor = Colors.grey.shade300;
+
+                  if (teamSnap.hasData && teamSnap.data!.exists) {
+                    final teamData =
+                        teamSnap.data!.data() as Map<String, dynamic>;
+                    logoUrl = teamData['logoUrl'];
+                    teamName = teamData['name'] ?? teamName;
+                    teamColor = _hexToColor(teamData['teamColor']);
+                  }
+
+                  return Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: teamColor, width: 2),
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () =>
-                          _openChangeModal(attendingPlayers, startTime),
-                      child: const Text('🔄 교체 기록'),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
                     ),
-                  ],
-                ),
-                const Divider(height: 32),
-                Text(
-                  '📋 실시간 경기 기록',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('matches')
-                      .doc(widget.event.id)
-                      .collection('records')
-                      .orderBy('createdAt', descending: false)
-                      .snapshots(),
-                  builder: (context, recSnap) {
-                    if (!recSnap.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (recSnap.data!.docs.isEmpty) {
-                      return const Text('기록 없음');
-                    }
-                    return ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: recSnap.data!.docs.length,
-                      itemBuilder: (ctx, i) {
-                        final doc = recSnap.data!.docs[i];
-                        final record = doc.data() as Map<String, dynamic>;
-                        return RecordTile(
-                          record: record,
-                          displayMap: displayMap,
-                          onEdit: () =>
-                              _openEditModal(record, doc.id, attendingPlayers),
-                          onDelete: () async =>
-                              await _matchService.deleteRecord(doc.id),
+                    child: ListTile(
+                      leading: (logoUrl != null && logoUrl.isNotEmpty)
+                          ? CircleAvatar(
+                              backgroundImage: NetworkImage(logoUrl),
+                              backgroundColor: teamColor.withOpacity(0.2),
+                            )
+                          : CircleAvatar(
+                              backgroundColor: teamColor,
+                              child: const Icon(
+                                Icons.sports_soccer,
+                                color: Colors.white,
+                              ),
+                            ),
+                      title: GestureDetector(
+                        onTap: () {
+                          if (match.location != null &&
+                              match.location!.isNotEmpty) {
+                            _openMap(match.location!);
+                          }
+                        },
+                        child: Text(
+                          '${match.time ?? ''} @ ${match.location ?? ''}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline, // 지도 링크 강조
+                          ),
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('상대팀: $teamName'),
+                          Text('점수: ${match.score.home} - ${match.score.away}'),
+                          Text(
+                            dDay == 0
+                                ? 'D-Day'
+                                : dDay > 0
+                                ? 'D-$dDay'
+                                : 'D+${-dDay}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: dDay == 0
+                                  ? Colors.red
+                                  : (dDay > 0 && dDay <= 3)
+                                  ? Colors.orange
+                                  : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // ✅ 상세 페이지로 이동
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MatchDetailPage(event: match),
+                          ),
                         );
                       },
-                    );
-                  },
-                ),
-              ],
-            ),
+                    ),
+                  );
+                },
+              );
+            },
           );
         },
       ),

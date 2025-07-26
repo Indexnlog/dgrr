@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/match_event_model.dart';
-import 'match_detail_page.dart'; // 상세 페이지 import
+import 'match_detail_page.dart';
+import '../manage/team_page.dart'; // ✅ 팀 리스트 페이지 import
 
 class MatchPage extends StatelessWidget {
   const MatchPage({super.key});
@@ -39,7 +40,22 @@ class MatchPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('⚽ 매치')),
+      // ✅ AppBar 수정: 팀 리스트 버튼 추가
+      appBar: AppBar(
+        title: const Text('⚽ 매치'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.groups),
+            tooltip: '상대팀 목록',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TeamPage()),
+              );
+            },
+          ),
+        ],
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('matches')
@@ -124,7 +140,7 @@ class MatchPage extends StatelessWidget {
                           '${match.time ?? ''} @ ${match.location ?? ''}',
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline, // 지도 링크 강조
+                            decoration: TextDecoration.underline,
                           ),
                         ),
                       ),
