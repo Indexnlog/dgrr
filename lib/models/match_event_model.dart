@@ -1,96 +1,54 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MatchEvent {
-  final String id; // 문서 ID
-  final String teamId; // teams 컬렉션 문서 ID
-  final String teamName; // 상대팀 이름 (캐싱)
-  final DateTime? date; // 경기 날짜 (Timestamp or String)
-  final String? time; // 경기 시간
-  final String? location; // 장소
-  final String status; // scheduled / finished / canceled
-  final DateTime? createdAt; // 생성 시각
-  final Score score; // 경기 결과
-  final List<Participant> participants; // 참가자
-  final List<MatchComment> comments; // 댓글
+  final String id;
+  final String teamId;
+  final String teamName;
+  final DateTime date;
+  final String? time;
+  final String? location;
+  final dynamic score;
+
+  // 🔥 새로 추가
+  final String recruitStatus; // waiting / confirmed
+  final String gameStatus; // notStarted / inProgress / finished
 
   MatchEvent({
     required this.id,
     required this.teamId,
     required this.teamName,
-    this.date,
+    required this.date,
     this.time,
     this.location,
-    required this.status,
-    this.createdAt,
-    required this.score,
-    required this.participants,
-    required this.comments,
+    this.score,
+    this.recruitStatus = 'waiting',
+    this.gameStatus = 'notStarted',
   });
 
-  /// Firestore → MatchEvent
-  factory MatchEvent.fromMap(Map<String, dynamic> map, String id) {
-    // date 변환
-    DateTime? parsedDate;
-    final rawDate = map['date'];
-    if (rawDate is Timestamp) {
-      parsedDate = rawDate.toDate();
-    } else if (rawDate is String) {
-      parsedDate = DateTime.tryParse(rawDate);
-    }
-
-    // createdAt 변환
-    DateTime? parsedCreated;
-    final rawCreated = map['createdAt'];
-    if (rawCreated is Timestamp) {
-      parsedCreated = rawCreated.toDate();
-    } else if (rawCreated is String) {
-      parsedCreated = DateTime.tryParse(rawCreated);
-    }
-
-    // participants
-    final participantsList = (map['participants'] as List<dynamic>? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map((p) => Participant.fromMap(p))
-        .toList();
-
-    // comments
-    final commentsList = (map['comments'] as List<dynamic>? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map((c) => MatchComment.fromMap(c))
-        .toList();
-
-    // score
-    final scoreMap = map['score'] as Map<String, dynamic>? ?? {};
-    final score = Score.fromMap(scoreMap);
-
+  factory MatchEvent.fromMap(Map<String, dynamic> data, String documentId) {
     return MatchEvent(
-      id: id,
-      teamId: map['teamId']?.toString() ?? '',
-      teamName: map['teamName']?.toString() ?? '',
-      date: parsedDate,
-      time: map['time']?.toString(),
-      location: map['location']?.toString(),
-      status: map['status']?.toString() ?? '',
-      createdAt: parsedCreated,
-      score: score,
-      participants: participantsList,
-      comments: commentsList,
+      id: documentId,
+      teamId: data['teamId'] ?? '',
+      teamName: data['teamName'] ?? '',
+      date: (data['date'] as Timestamp).toDate(),
+      time: data['time'],
+      location: data['location'],
+      score: data['score'],
+      recruitStatus: data['recruitStatus'] ?? 'waiting',
+      gameStatus: data['gameStatus'] ?? 'notStarted',
     );
   }
 
-  /// MatchEvent → Firestore
   Map<String, dynamic> toMap() {
     return {
       'teamId': teamId,
       'teamName': teamName,
-      'date': date, // Timestamp로 자동 변환
+      'date': date,
       'time': time,
       'location': location,
-      'status': status,
-      'createdAt': createdAt,
-      'score': score.toMap(),
-      'participants': participants.map((p) => p.toMap()).toList(),
-      'comments': comments.map((c) => c.toMap()).toList(),
+      'score': score,
+      'recruitStatus': recruitStatus,
+      'gameStatus': gameStatus,
     };
   }
 }

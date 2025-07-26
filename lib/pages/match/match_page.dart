@@ -1,132 +1,172 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/match_event_model.dart';
+import 'match_detail_page.dart'; // 상세 페이지 import
 
-class MatchPage extends StatefulWidget {
+class MatchPage extends StatelessWidget {
   const MatchPage({super.key});
 
-  @override
-  State<MatchPage> createState() => _MatchPageState();
-}
+  // HEX -> Color 변환
+  Color _hexToColor(String? hex) {
+    if (hex == null || hex.isEmpty) return Colors.grey.shade300;
+    final buffer = StringBuffer();
+    if (hex.length == 6 || hex.length == 7) buffer.write('ff');
+    buffer.write(hex.replaceFirst('#', ''));
+    return Color(int.parse(buffer.toString(), radix: 16));
+  }
 
-class _MatchPageState extends State<MatchPage> {
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
+  // 네이버 지도 딥링크 열기
+  Future<void> _openMap(String location) async {
+    final encodedLocation = Uri.encodeComponent(location);
+
+    // 네이버 지도 앱 스킴
+    final naverMapUrl = Uri.parse('nmap://search?query=$encodedLocation');
+    // 웹 브라우저 fallback
+    final webUrl = Uri.parse(
+      'https://map.naver.com/v5/search/$encodedLocation',
+    );
+
+    if (await canLaunchUrl(naverMapUrl)) {
+      await launchUrl(naverMapUrl, mode: LaunchMode.externalApplication);
+    } else if (await canLaunchUrl(webUrl)) {
+      await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+    } else {
+      debugPrint('지도를 열 수 없습니다.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('⚽ 매치'),
-      ),
-      body: Column(
-        children: [
-          // 🗓️ 날짜 선택 (필요시 TableCalendar 추가 가능)
-          // 여기서는 간단히 필터링만
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                ElevatedButton(
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _focusedDay,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2030),
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        _selectedDay = picked;
-                        _focusedDay = picked;
-                      });
-                    }
-                  },
-                  child: Text(_selectedDay == null
-                      ? '날짜 선택'
-                      : '${_selectedDay!.year}-${_selectedDay!.month}-${_selectedDay!.day}'),
-                ),
-                const SizedBox(width: 8),
-                if (_selectedDay != null)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      setState(() {
-                        _selectedDay = null;
-                      });
-                    },
-                  ),
-              ],
-            ),
-          ),
+      appBar: AppBar(title: const Text('⚽ 매치')),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('matches')
+            .where('status', isEqualTo: 'confirmed')
+            .orderBy('date', descending: false)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text('등록된 매치가 없습니다.'));
+          }
 
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('matches') // ✅ matches 컬렉션 구독
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text('등록된 매치가 없습니다.'));
-                }
+          final matches = snapshot.data!.docs.map((doc) {
+            return MatchEvent.fromMap(
+              doc.data() as Map<String, dynamic>,
+              doc.id,
+            );
+          }).toList();
 
-                // Firestore → MatchEvent
-                final allMatches = <MatchEvent>[];
-                for (final doc in snapshot.data!.docs) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  try {
-                    final match = MatchEvent.fromMap(data, doc.id);
-                    allMatches.add(match);
-                  } catch (e) {
-                    print('❌ [fromMap 오류] matches ${doc.id}: $e');
+          return ListView.builder(
+            itemCount: matches.length,
+            itemBuilder: (context, index) {
+              final match = matches[index];
+              final now = DateTime.now();
+              final matchDate = match.date;
+              final dDay = matchDate
+                  .difference(DateTime(now.year, now.month, now.day))
+                  .inDays;
+
+              return FutureBuilder<DocumentSnapshot>(
+                future: match.teamId != null
+                    ? FirebaseFirestore.instance
+                          .collection('teams')
+                          .doc(match.teamId)
+                          .get()
+                    : null,
+                builder: (ctx, teamSnap) {
+                  String? logoUrl;
+                  String? teamName = match.teamName;
+                  Color teamColor = Colors.grey.shade300;
+
+                  if (teamSnap.hasData && teamSnap.data!.exists) {
+                    final teamData =
+                        teamSnap.data!.data() as Map<String, dynamic>;
+                    logoUrl = teamData['logoUrl'];
+                    teamName = teamData['name'] ?? teamName;
+                    teamColor = _hexToColor(teamData['teamColor']);
                   }
-                }
 
-                // 날짜 필터링
-                final filteredMatches = allMatches.where((m) {
-                  if (_selectedDay == null) return true;
-                  return m.date.year == _selectedDay!.year &&
-                      m.date.month == _selectedDay!.month &&
-                      m.date.day == _selectedDay!.day;
-                }).toList();
-
-                if (filteredMatches.isEmpty) {
-                  return const Center(child: Text('해당 날짜에 매치가 없습니다.'));
-                }
-
-                return ListView.builder(
-                  itemCount: filteredMatches.length,
-                  itemBuilder: (context, index) {
-                    final match = filteredMatches[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      child: ListTile(
-                        leading: const Icon(Icons.sports_soccer,
-                            color: Colors.green),
-                        title: Text(
-                          '${match.time ?? ''} @ ${match.location ?? ''}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('상대팀: ${match.teamName ?? '-'}'),
-                            Text(
-                                '점수: ${match.score['home']} - ${match.score['away']}'),
-                            Text('참석자: ${match.participants.length}'),
-                          ],
-                        ),
+                  return Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: teamColor, width: 2),
+                    ),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    child: ListTile(
+                      leading: (logoUrl != null && logoUrl.isNotEmpty)
+                          ? CircleAvatar(
+                              backgroundImage: NetworkImage(logoUrl),
+                              backgroundColor: teamColor.withOpacity(0.2),
+                            )
+                          : CircleAvatar(
+                              backgroundColor: teamColor,
+                              child: const Icon(
+                                Icons.sports_soccer,
+                                color: Colors.white,
+                              ),
+                            ),
+                      title: GestureDetector(
                         onTap: () {
-                          // 👉 상세 페이지로 이동하고 싶다면 여기에 Navigator.push 추가
-                          // Navigator.push(
-                          //   context,
-                          //   MaterialPageRoute(
-                          //     builder: (context) => MatchDetailPage(matchId: match.id),
-                          //   ),
-                          // );
+                          if (match.location != null &&
+                              match.location!.isNotEmpty) {
+                            _openMap(match.location!);
+                          }
                         },
+                        child: Text(
+                          '${match.time ?? ''} @ ${match.location ?? ''}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            decoration: TextDecoration.underline, // 지도 링크 강조
+                          ),
+                        ),
                       ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('상대팀: $teamName'),
+                          Text('점수: ${match.score.home} - ${match.score.away}'),
+                          Text(
+                            dDay == 0
+                                ? 'D-Day'
+                                : dDay > 0
+                                ? 'D-$dDay'
+                                : 'D+${-dDay}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: dDay == 0
+                                  ? Colors.red
+                                  : (dDay > 0 && dDay <= 3)
+                                  ? Colors.orange
+                                  : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // ✅ 상세 페이지로 이동
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MatchDetailPage(event: match),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}

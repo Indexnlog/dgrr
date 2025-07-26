@@ -1,85 +1,62 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../models/match_event_model.dart';
 
 class MatchService {
-  /// ✅ matches 컬렉션 실시간 구독 (status 필터링 가능)
-  static Stream<List<MatchEvent>> getMatches({String? status}) {
-    Query query = FirebaseFirestore.instance.collection('matches');
+  final String matchId;
+  MatchService(this.matchId);
 
-    // status로 필터링하고 싶으면 이렇게
-    if (status != null) {
-      query = query.where('status', isEqualTo: status);
-    }
+  CollectionReference get _recordsRef => FirebaseFirestore.instance
+      .collection('matches')
+      .doc(matchId)
+      .collection('records');
 
-    return query.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        return MatchEvent.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-      }).toList();
+  /// 득점 기록 추가
+  Future<void> addGoalRecord(String playerId, String memo, int offset) async {
+    await _recordsRef.add({
+      'type': 'goal',
+      'playerName': playerId,
+      'timeOffset': offset,
+      'memo': memo,
+      'createdAt': Timestamp.now(),
     });
   }
 
-  /// ✅ 매치 단일 문서 스트림 (상세 페이지에서 사용)
-  static Stream<MatchEvent?> getMatchDetail(String matchId) {
-    return FirebaseFirestore.instance
-        .collection('matches')
-        .doc(matchId)
-        .snapshots()
-        .map((doc) {
-          if (!doc.exists) return null;
-          return MatchEvent.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-        });
+  /// 교체 기록 추가
+  Future<void> addChangeRecord(
+    String outPlayerId,
+    String inPlayerId,
+    String memo,
+    int offset,
+  ) async {
+    await _recordsRef.add({
+      'type': 'change',
+      'outPlayerName': outPlayerId,
+      'inPlayerName': inPlayerId,
+      'timeOffset': offset,
+      'memo': memo,
+      'createdAt': Timestamp.now(),
+    });
   }
 
-  /// ✅ 참석/불참 업데이트
-  static Future<void> updateAttendance({
-    required String matchId,
-    required String userId,
-    required String status, // 'attending' or 'absent'
-    String? reason,
-  }) async {
-    final docRef = FirebaseFirestore.instance
+  /// 기록 메모 수정
+  Future<void> updateRecordMemo(String recordId, String newMemo) async {
+    await _recordsRef.doc(recordId).update({'memo': newMemo});
+  }
+
+  /// 기록 삭제
+  Future<void> deleteRecord(String recordId) async {
+    await _recordsRef.doc(recordId).delete();
+  }
+
+  /// 경기 상태 업데이트 (시작/종료)
+  Future<void> updateGameStatus(String newStatus) async {
+    final now = Timestamp.now();
+    final matchRef = FirebaseFirestore.instance
         .collection('matches')
         .doc(matchId);
-
-    await FirebaseFirestore.instance.runTransaction((transaction) async {
-      final snapshot = await transaction.get(docRef);
-      if (!snapshot.exists) return;
-
-      final data = snapshot.data() as Map<String, dynamic>;
-      List attendees = List.from(data['attendees'] ?? []);
-
-      // 기존 참석자 찾기
-      final idx = attendees.indexWhere((a) => a['userId'] == userId);
-      final newData = {
-        'userId': userId,
-        'status': status,
-        'reason': reason ?? '',
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-
-      if (idx >= 0) {
-        attendees[idx] = newData;
-      } else {
-        attendees.add(newData);
-      }
-
-      transaction.update(docRef, {'attendees': attendees});
-    });
-  }
-
-  /// ✅ 새로운 비정기 매치 등록
-  static Future<void> addIrregularMatch(MatchEvent match) async {
-    await FirebaseFirestore.instance.collection('matches').add(match.toMap());
-  }
-
-  /// ✅ 기존 매치 수정 (예: 상대팀 확정)
-  static Future<void> updateMatch(
-    String matchId,
-    Map<String, dynamic> data,
-  ) async {
-    await FirebaseFirestore.instance
-        .collection('matches')
-        .doc(matchId)
-        .update(data);
+    if (newStatus == 'inProgress') {
+      await matchRef.update({'gameStatus': 'inProgress', 'startTime': now});
+    } else if (newStatus == 'finished') {
+      await matchRef.update({'gameStatus': 'finished', 'endTime': now});
+    }
   }
 }

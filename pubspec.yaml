@@ -31,23 +31,26 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # Firebase
+  # 🔥 Firebase 기본
   firebase_core: ^3.4.0
   firebase_auth: ^5.3.0
   cloud_firestore: ^5.4.4
   firebase_storage: ^12.3.1
 
-  # Google 로그인
+  # 🔑 Google 로그인
   google_sign_in: ^6.2.1
 
-  # 이미지 업로드
+  # 📸 이미지 업로드
   image_picker: ^1.1.2
   path: ^1.9.0
 
-  # UI/기타
+  # 🎨 UI/기타
   cupertino_icons: ^1.0.8
   table_calendar: ^3.0.8
   url_launcher: ^6.3.0
+  flutter_colorpicker: ^1.0.3
+
+
 
 
 
