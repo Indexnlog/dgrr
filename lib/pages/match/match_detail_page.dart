@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/match_event_model.dart';
-import '../../widgets/team_select_bottom_sheet.dart'; // 팀 선택 BottomSheet 위젯
+import 'widgets/round_selector.dart';
+import 'widgets/record_buttons.dart';
+import 'widgets/record_modals.dart';
+import 'widgets/record_list.dart';
+import 'widgets/team_select_button.dart';
+import '../../services/firestore/match_service.dart';
 
 class MatchDetailPage extends StatefulWidget {
   final MatchEvent event;
@@ -12,324 +17,154 @@ class MatchDetailPage extends StatefulWidget {
 }
 
 class _MatchDetailPageState extends State<MatchDetailPage> {
-  bool _bottomSheetShown = false; // 여러 번 뜨지 않게 방지
+  String? selectedRoundId;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('📋 경기 상세')),
+      appBar: AppBar(title: Text('📋 ${widget.event.teamName}')),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('matches')
             .doc(widget.event.id)
             .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+        builder: (context, snap) {
+          if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: Text('경기 정보를 불러올 수 없습니다.'));
-          }
 
-          final data = snapshot.data!.data() as Map<String, dynamic>;
+          final data = snap.data!.data() as Map<String, dynamic>;
           final participants = (data['participants'] ?? []) as List;
-          final teamId = data['teamId'] as String?;
-          final status = data['status'] as String? ?? '대기중';
+          final recruitStatus = data['recruitStatus'] ?? 'waiting';
 
-          // ✅ 참석자 7명 이상 & 팀 미지정 → BottomSheet 자동 호출
-          if (!_bottomSheetShown &&
-              participants.length >= 7 &&
-              (teamId == null || teamId.isEmpty)) {
-            _bottomSheetShown = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _showTeamSelectBottomSheet(widget.event.id);
-            });
-          }
-
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '경기 상태: $status',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text('참석자 수: ${participants.length} 명'),
-                const SizedBox(height: 12),
-
-                // ✅ 상태 전환 버튼
-                ElevatedButton(
-                  onPressed: () async {
-                    await _toggleMatchStatus(widget.event.id);
-                  },
-                  child: const Text('경기 상태 전환'),
-                ),
-
-                const Divider(height: 32),
-
-                const Text(
-                  '참석자 목록',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: participants.length,
-                    itemBuilder: (context, index) {
-                      return Text('- ${participants[index]}');
-                    },
-                  ),
-                ),
-
-                const Divider(height: 32),
-
-                // ✅ 기록 추가 버튼들
-                Row(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 상단 정보
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.sports_soccer),
-                      label: const Text('득점 기록'),
-                      onPressed: () {
-                        _showRecordGoalModal(widget.event.id);
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.compare_arrows),
-                      label: const Text('교체 기록'),
-                      onPressed: () {
-                        _showRecordChangeModal(widget.event.id);
-                      },
-                    ),
+                    Text('모집 상태: $recruitStatus'),
+                    Text('참석자 수: ${participants.length} 명'),
+                    const SizedBox(height: 8),
+                    TeamSelectButton(matchId: widget.event.id),
                   ],
                 ),
+              ),
+              const Divider(height: 1),
 
-                const SizedBox(height: 12),
+              // 라운드 선택
+              RoundSelector(
+                matchId: widget.event.id,
+                onSelected: (roundId) {
+                  setState(() => selectedRoundId = roundId);
+                },
+              ),
 
-                // ✅ 실시간 경기 기록
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
+              // 라운드별 기록 관리
+              if (selectedRoundId != null) ...[
+                // 라운드 상태 관리 버튼
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: StreamBuilder<DocumentSnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('matches')
                         .doc(widget.event.id)
-                        .collection('records')
-                        .orderBy('createdAt', descending: false)
+                        .collection('rounds')
+                        .doc(selectedRoundId!)
                         .snapshots(),
-                    builder: (context, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                    builder: (context, roundSnap) {
+                      if (!roundSnap.hasData || !roundSnap.data!.exists) {
+                        return const SizedBox();
                       }
-                      if (!snap.hasData || snap.data!.docs.isEmpty) {
-                        return const Center(child: Text('기록이 없습니다.'));
-                      }
-                      final records = snap.data!.docs;
-                      return ListView(
-                        children: records.map((doc) {
-                          final r = doc.data() as Map<String, dynamic>;
-                          return ListTile(
-                            leading: r['type'] == 'goal'
-                                ? const Icon(
-                                    Icons.sports_soccer,
-                                    color: Colors.green,
-                                  )
-                                : const Icon(
-                                    Icons.compare_arrows,
-                                    color: Colors.blue,
-                                  ),
-                            title: Text('${r['player']}'),
-                            subtitle: Text('${r['timeOffset']}분 경과'),
-                            onLongPress: () async {
-                              // ✅ 롱프레스 시 기록 삭제
-                              await doc.reference.delete();
-                            },
-                          );
-                        }).toList(),
+                      final roundData =
+                          roundSnap.data!.data() as Map<String, dynamic>;
+                      final status = roundData['status'] ?? 'notStarted';
+
+                      return Row(
+                        children: [
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.play_arrow),
+                            label: const Text('라운드 시작'),
+                            onPressed: status == 'notStarted'
+                                ? () async {
+                                    await MatchService.updateRoundStatus(
+                                      widget.event.id,
+                                      selectedRoundId!,
+                                      'inProgress',
+                                    );
+                                    await FirebaseFirestore.instance
+                                        .collection('matches')
+                                        .doc(widget.event.id)
+                                        .collection('rounds')
+                                        .doc(selectedRoundId!)
+                                        .update({'startTime': Timestamp.now()});
+                                  }
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.stop),
+                            label: const Text('라운드 종료'),
+                            onPressed: status == 'inProgress'
+                                ? () async {
+                                    await MatchService.updateRoundStatus(
+                                      widget.event.id,
+                                      selectedRoundId!,
+                                      'finished',
+                                    );
+                                    await FirebaseFirestore.instance
+                                        .collection('matches')
+                                        .doc(widget.event.id)
+                                        .collection('rounds')
+                                        .doc(selectedRoundId!)
+                                        .update({'endTime': Timestamp.now()});
+                                  }
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Text('상태: $status'),
+                        ],
                       );
                     },
                   ),
                 ),
 
-                const SizedBox(height: 8),
-
-                // ✅ 수동으로 팀 선택 BottomSheet 열기 (필요 시)
-                ElevatedButton(
-                  onPressed: () {
-                    _showTeamSelectBottomSheet(widget.event.id);
+                // 득점/교체 기록 버튼
+                RecordButtons(
+                  onAddGoal: () {
+                    showRecordGoalModal(
+                      context,
+                      widget.event.id,
+                      selectedRoundId!,
+                    );
                   },
-                  child: const Text('상대팀 선택 (수동)'),
+                  onAddChange: () {
+                    showRecordChangeModal(
+                      context,
+                      widget.event.id,
+                      selectedRoundId!,
+                    );
+                  },
+                ),
+
+                // 기록 리스트
+                Expanded(
+                  child: RecordList(
+                    matchId: widget.event.id,
+                    roundId: selectedRoundId!,
+                  ),
                 ),
               ],
-            ),
+            ],
           );
         },
       ),
-    );
-  }
-
-  // ✅ 팀 선택 BottomSheet
-  void _showTeamSelectBottomSheet(String matchId) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return TeamSelectBottomSheet(
-          onTeamSelected: (selectedTeamId) {
-            _updateMatchWithTeamId(matchId, selectedTeamId);
-          },
-        );
-      },
-    );
-  }
-
-  // ✅ Firestore 팀 정보 업데이트
-  Future<void> _updateMatchWithTeamId(String matchId, String teamId) async {
-    await FirebaseFirestore.instance.collection('matches').doc(matchId).update({
-      'teamId': teamId,
-      'status': 'confirmed',
-    });
-  }
-
-  // ✅ 상태 전환 함수
-  Future<void> _toggleMatchStatus(String matchId) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('matches')
-        .doc(matchId)
-        .get();
-    if (!doc.exists) return;
-
-    final currentStatus = doc['status'] ?? '대기중';
-    final now = DateTime.now();
-    String newStatus;
-    final updates = <String, dynamic>{};
-
-    if (currentStatus == '대기중') {
-      newStatus = '진행중';
-      updates['startTime'] = now;
-    } else if (currentStatus == '진행중') {
-      newStatus = '종료';
-      updates['endTime'] = now;
-    } else {
-      newStatus = '대기중';
-      updates.remove('startTime');
-      updates.remove('endTime');
-    }
-    updates['status'] = newStatus;
-
-    await FirebaseFirestore.instance
-        .collection('matches')
-        .doc(matchId)
-        .update(updates);
-  }
-
-  // ✅ 기록 추가 함수
-  Future<void> _addMatchRecord(
-    String matchId,
-    String type,
-    String playerInfo,
-  ) async {
-    final matchDoc = await FirebaseFirestore.instance
-        .collection('matches')
-        .doc(matchId)
-        .get();
-    if (!matchDoc.exists) return;
-
-    DateTime? startTime = (matchDoc.data()?['startTime'] as Timestamp?)
-        ?.toDate();
-    int offset = 0;
-    if (startTime != null) {
-      offset = DateTime.now().difference(startTime).inMinutes;
-    }
-
-    await FirebaseFirestore.instance
-        .collection('matches')
-        .doc(matchId)
-        .collection('records')
-        .add({
-          'type': type,
-          'player': playerInfo,
-          'timeOffset': offset,
-          'createdAt': Timestamp.now(),
-        });
-  }
-
-  // ✅ 득점 모달
-  void _showRecordGoalModal(String matchId) {
-    String playerName = '';
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('득점 기록'),
-          content: TextField(
-            decoration: const InputDecoration(labelText: '선수 닉네임'),
-            onChanged: (v) => playerName = v,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (playerName.trim().isEmpty) return;
-                await _addMatchRecord(matchId, 'goal', playerName);
-                if (mounted) Navigator.pop(context);
-              },
-              child: const Text('저장'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // ✅ 교체 모달
-  void _showRecordChangeModal(String matchId) {
-    String outPlayer = '';
-    String inPlayer = '';
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('교체 기록'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                decoration: const InputDecoration(labelText: 'OUT 선수'),
-                onChanged: (v) => outPlayer = v,
-              ),
-              TextField(
-                decoration: const InputDecoration(labelText: 'IN 선수'),
-                onChanged: (v) => inPlayer = v,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (outPlayer.trim().isEmpty || inPlayer.trim().isEmpty) return;
-                await _addMatchRecord(
-                  matchId,
-                  'change',
-                  '$outPlayer → $inPlayer',
-                );
-                if (mounted) Navigator.pop(context);
-              },
-              child: const Text('저장'),
-            ),
-          ],
-        );
-      },
     );
   }
 }

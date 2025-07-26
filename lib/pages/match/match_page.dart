@@ -3,12 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/match_event_model.dart';
 import 'match_detail_page.dart';
-import '../manage/team_page.dart'; // ✅ 팀 리스트 페이지 import
+import '../manage/team_page.dart';
 
 class MatchPage extends StatelessWidget {
   const MatchPage({super.key});
 
-  // HEX -> Color 변환
+  // HEX → Color 변환
   Color _hexToColor(String? hex) {
     try {
       if (hex == null || hex.isEmpty) return Colors.grey.shade300;
@@ -42,7 +42,6 @@ class MatchPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ✅ AppBar 수정: 팀 리스트 버튼 추가
       appBar: AppBar(
         title: const Text('⚽ 매치'),
         actions: [
@@ -61,8 +60,8 @@ class MatchPage extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('matches')
-            .where('status', isEqualTo: 'confirmed')
-            .orderBy('date', descending: false)
+            .where('recruitStatus', isEqualTo: 'confirmed')
+            // .orderBy('date', descending: false)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -89,14 +88,14 @@ class MatchPage extends StatelessWidget {
                   .difference(DateTime(now.year, now.month, now.day))
                   .inDays;
 
-              // 팀 정보 가져오기
-              if (match.teamId == null || match.teamId!.isEmpty) {
-                // teamId가 없는 경우 기본 카드로 바로 표시
+              if (match.teamId.isEmpty) {
                 return _buildMatchCard(
                   context: context,
                   match: match,
                   dDay: dDay,
-                  teamName: match.teamName ?? '상대팀 미지정',
+                  teamName: match.teamName.isNotEmpty
+                      ? match.teamName
+                      : '상대팀 미지정',
                   teamColor: Colors.grey.shade300,
                   logoUrl: null,
                 );
@@ -116,14 +115,14 @@ class MatchPage extends StatelessWidget {
                   }
 
                   String? logoUrl;
-                  String? teamName = match.teamName;
+                  String teamName = match.teamName;
                   Color teamColor = Colors.grey.shade300;
 
                   if (teamSnap.hasData && teamSnap.data!.exists) {
                     final teamData =
                         teamSnap.data!.data() as Map<String, dynamic>;
                     logoUrl = teamData['logoUrl'];
-                    teamName = teamData['name'] ?? teamName;
+                    teamName = (teamData['name'] ?? teamName).toString();
                     teamColor = _hexToColor(teamData['teamColor']);
                   }
 
@@ -131,7 +130,7 @@ class MatchPage extends StatelessWidget {
                     context: context,
                     match: match,
                     dDay: dDay,
-                    teamName: teamName ?? '상대팀',
+                    teamName: teamName,
                     teamColor: teamColor,
                     logoUrl: logoUrl,
                   );
@@ -187,7 +186,42 @@ class MatchPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('상대팀: $teamName'),
-            Text('점수: ${match.score.home} - ${match.score.away}'),
+
+            // ✅ 라운드 점수 합산
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('matches')
+                  .doc(match.id)
+                  .collection('rounds')
+                  .orderBy('startTime', descending: false)
+                  .limit(10)
+                  .snapshots(),
+              builder: (context, roundSnap) {
+                if (roundSnap.connectionState == ConnectionState.waiting) {
+                  return const Text('점수 계산 중...');
+                }
+                if (!roundSnap.hasData || roundSnap.data!.docs.isEmpty) {
+                  return const Text('점수: 0 - 0');
+                }
+
+                int homeTotal = 0;
+                int awayTotal = 0;
+
+                for (var doc in roundSnap.data!.docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final score = data['score'] as Map<String, dynamic>?;
+
+                  if (score != null) {
+                    homeTotal += (score['home'] ?? 0) as int;
+                    awayTotal += (score['away'] ?? 0) as int;
+                  }
+                }
+
+                return Text('점수: $homeTotal - $awayTotal');
+              },
+            ),
+
+            Text('경기상태: ${match.gameStatus}'),
             Text(
               dDay == 0
                   ? 'D-Day'
@@ -204,6 +238,15 @@ class MatchPage extends StatelessWidget {
               ),
             ),
           ],
+        ),
+        trailing: Chip(
+          label: Text(
+            match.recruitStatus,
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: match.recruitStatus == 'confirmed'
+              ? Colors.green
+              : Colors.blueGrey,
         ),
         onTap: () {
           Navigator.push(

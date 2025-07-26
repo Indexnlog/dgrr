@@ -1,16 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// 📌 매치 기본 정보 (전체 메타)
 class MatchEvent {
   final String id;
   final String teamId;
   final String teamName;
   final DateTime date;
-  final String? time;
+  final String? time; // "19:00~21:00" 형태
   final String? location;
-  final dynamic score;
 
-  // 🔥 새로 추가
   final String recruitStatus; // waiting / confirmed
+  // 경기 자체의 상태는 시간으로 계산하거나 필요시 사용
   final String gameStatus; // notStarted / inProgress / finished
 
   MatchEvent({
@@ -20,7 +20,6 @@ class MatchEvent {
     required this.date,
     this.time,
     this.location,
-    this.score,
     this.recruitStatus = 'waiting',
     this.gameStatus = 'notStarted',
   });
@@ -33,7 +32,6 @@ class MatchEvent {
       date: (data['date'] as Timestamp).toDate(),
       time: data['time'],
       location: data['location'],
-      score: data['score'],
       recruitStatus: data['recruitStatus'] ?? 'waiting',
       gameStatus: data['gameStatus'] ?? 'notStarted',
     );
@@ -46,33 +44,106 @@ class MatchEvent {
       'date': date,
       'time': time,
       'location': location,
-      'score': score,
       'recruitStatus': recruitStatus,
       'gameStatus': gameStatus,
     };
   }
 }
 
-/// 🏷️ 점수
-class Score {
-  final int home;
-  final int away;
+/// 📌 라운드 정보 (하위 컬렉션)
+class Round {
+  final String id; // r1, r2, r3...
+  final String status; // notStarted / inProgress / finished
+  final DateTime? startTime;
+  final DateTime? endTime;
+  final int homeScore;
+  final int awayScore;
 
-  Score({required this.home, required this.away});
+  Round({
+    required this.id,
+    required this.status,
+    this.startTime,
+    this.endTime,
+    required this.homeScore,
+    required this.awayScore,
+  });
 
-  factory Score.fromMap(Map<String, dynamic> map) {
-    return Score(
-      home: map['home'] is int ? map['home'] : (map['home'] ?? 0),
-      away: map['away'] is int ? map['away'] : (map['away'] ?? 0),
+  factory Round.fromMap(Map<String, dynamic> data, String docId) {
+    return Round(
+      id: docId,
+      status: data['status'] ?? 'notStarted',
+      startTime: data['startTime'] != null
+          ? (data['startTime'] as Timestamp).toDate()
+          : null,
+      endTime: data['endTime'] != null
+          ? (data['endTime'] as Timestamp).toDate()
+          : null,
+      homeScore: data['score']?['home'] ?? 0,
+      awayScore: data['score']?['away'] ?? 0,
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {'home': home, 'away': away};
+    return {
+      'status': status,
+      'startTime': startTime,
+      'endTime': endTime,
+      'score': {'home': homeScore, 'away': awayScore},
+    };
   }
 }
 
-/// 👤 참가자
+/// 📌 라운드 안의 기록 (득점/교체)
+class RoundRecord {
+  final String id;
+  final String type; // goal / change
+  final String team; // home / away
+  final int timeOffset; // 시작으로부터 몇분 뒤
+  final String? playerName; // 득점한 선수
+  final String? inPlayerName; // 교체 IN
+  final String? outPlayerName; // 교체 OUT
+  final String? memo;
+
+  RoundRecord({
+    required this.id,
+    required this.type,
+    required this.team,
+    required this.timeOffset,
+    this.playerName,
+    this.inPlayerName,
+    this.outPlayerName,
+    this.memo,
+  });
+
+  factory RoundRecord.fromMap(Map<String, dynamic> data, String docId) {
+    return RoundRecord(
+      id: docId,
+      type: data['type'] ?? '',
+      team: data['team'] ?? '',
+      timeOffset: (data['timeOffset'] is int)
+          ? data['timeOffset']
+          : int.tryParse(data['timeOffset'].toString()) ?? 0,
+      playerName: data['playerName'],
+      inPlayerName: data['inPlayerName'],
+      outPlayerName: data['outPlayerName'],
+      memo: data['memo'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'type': type,
+      'team': team,
+      'timeOffset': timeOffset,
+      'playerName': playerName,
+      'inPlayerName': inPlayerName,
+      'outPlayerName': outPlayerName,
+      'memo': memo,
+    };
+  }
+}
+
+/// 👤 참가자 (기존 구조 유지)
 class Participant {
   final String userId;
   final String status; // attending / absent / pending
@@ -113,7 +184,7 @@ class Participant {
   }
 }
 
-/// 💬 경기 댓글
+/// 💬 경기 댓글 (기존 구조 유지)
 class MatchComment {
   final String text;
   final String userId;
