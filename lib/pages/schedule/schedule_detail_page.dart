@@ -13,36 +13,32 @@ class ScheduleDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final docRef = FirebaseFirestore.instance
+    final eventRef = FirebaseFirestore.instance
         .collection(collectionName)
         .doc(docId);
 
     return Scaffold(
       appBar: AppBar(title: const Text('일정 상세')),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: docRef.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+        stream: eventRef.snapshots(),
+        builder: (context, eventSnap) {
+          if (eventSnap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!snapshot.hasData || !snapshot.data!.exists) {
+          if (!eventSnap.hasData || !eventSnap.data!.exists) {
             return const Center(child: Text('일정을 찾을 수 없습니다.'));
           }
 
-          final data = snapshot.data!.data() as Map<String, dynamic>;
+          final eventData = eventSnap.data!.data() as Map<String, dynamic>;
+          final dateTs = eventData['date'] as Timestamp?;
+          final eventDateStr = dateTs != null ? dateTs.toDate().toString() : '';
+          final timeStr =
+              '${eventData['startTime'] ?? ''}~${eventData['endTime'] ?? ''}';
+          final locationStr = eventData['location']?.toString() ?? '';
 
-          // attendees, comments 안전한 변환
-          final attendees = List<Map<String, dynamic>>.from(
-            (data['attendees'] ?? []) as List,
-          );
           final comments = List<Map<String, dynamic>>.from(
-            (data['comments'] ?? []) as List,
+            (eventData['comments'] ?? []) as List,
           );
-
-          // date와 time도 null-safe 처리
-          final dateStr = data['date']?.toString() ?? '';
-          final timeStr = data['time']?.toString() ?? '';
-          final locationStr = data['location']?.toString() ?? '';
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -51,7 +47,7 @@ class ScheduleDetailPage extends StatelessWidget {
               children: [
                 // 🏷 기본 정보
                 Text(
-                  '$dateStr $timeStr',
+                  '$eventDateStr $timeStr',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -67,47 +63,70 @@ class ScheduleDetailPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
 
-                // ✅ 참석자 명단
-                Text(
-                  '참석자 (${attendees.length})',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (attendees.isEmpty)
-                  const Text('참석자가 없습니다.')
-                else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: attendees.length,
-                    itemBuilder: (context, index) {
-                      final a = attendees[index];
-                      final status = a['status']?.toString() ?? '';
-                      final userId = a['userId']?.toString() ?? '알 수 없음';
-                      final reason = a['reason']?.toString();
+                // ✅ 참석자 명단 (registrations 컬렉션 기반)
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('registrations')
+                      .where('eventId', isEqualTo: docId)
+                      .where(
+                        'type',
+                        isEqualTo: collectionName == 'classes'
+                            ? 'class'
+                            : 'match',
+                      )
+                      .where('status', isEqualTo: 'registered')
+                      .snapshots(),
+                  builder: (context, regSnap) {
+                    if (regSnap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final regs = regSnap.data?.docs ?? [];
 
-                      return ListTile(
-                        leading: Icon(
-                          status == 'attending'
-                              ? Icons.check_circle
-                              : Icons.cancel,
-                          color: status == 'attending'
-                              ? Colors.green
-                              : Colors.red,
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '참석자 (${regs.length})',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                        title: Text(userId),
-                        subtitle: (reason != null && reason.isNotEmpty)
-                            ? Text('사유: $reason')
-                            : null,
-                      );
-                    },
-                  ),
+                        const SizedBox(height: 8),
+                        if (regs.isEmpty)
+                          const Text('참석자가 없습니다.')
+                        else
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: regs.length,
+                            itemBuilder: (context, index) {
+                              final reg =
+                                  regs[index].data() as Map<String, dynamic>;
+                              final userName = reg['userName'] ?? '이름없음';
+                              final number = reg['number']?.toString() ?? '';
+                              final photoUrl = reg['photoUrl'] ?? '';
+
+                              return ListTile(
+                                leading: photoUrl.isNotEmpty
+                                    ? CircleAvatar(
+                                        backgroundImage: NetworkImage(photoUrl),
+                                      )
+                                    : const CircleAvatar(
+                                        child: Icon(Icons.person),
+                                      ),
+                                title: Text('$userName (#$number)'),
+                              );
+                            },
+                          ),
+                      ],
+                    );
+                  },
+                ),
+
                 const Divider(height: 32),
 
-                // 💬 댓글 / 후기
+                // 💬 댓글 / 후기 (기존 classes/matches 문서 내 comments)
                 Text(
                   '후기 (${comments.length})',
                   style: const TextStyle(

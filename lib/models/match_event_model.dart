@@ -6,19 +6,19 @@ class MatchEvent {
   final String teamId;
   final String teamName;
   final DateTime date;
-  final String? time; // "19:00~21:00" 형태
+  final String? startTime; // ✅ 추가
+  final String? endTime; // ✅ 추가
   final String? location;
-
-  final String recruitStatus; // waiting / confirmed
-  // 경기 자체의 상태는 시간으로 계산하거나 필요시 사용
-  final String gameStatus; // notStarted / inProgress / finished
+  final String recruitStatus;
+  final String gameStatus;
 
   MatchEvent({
     required this.id,
     required this.teamId,
     required this.teamName,
     required this.date,
-    this.time,
+    this.startTime, // ✅ 추가
+    this.endTime, // ✅ 추가
     this.location,
     this.recruitStatus = 'waiting',
     this.gameStatus = 'notStarted',
@@ -30,7 +30,8 @@ class MatchEvent {
       teamId: data['teamId'] ?? '',
       teamName: data['teamName'] ?? '',
       date: (data['date'] as Timestamp).toDate(),
-      time: data['time'],
+      startTime: data['startTime'], // ✅ 추가
+      endTime: data['endTime'], // ✅ 추가
       location: data['location'],
       recruitStatus: data['recruitStatus'] ?? 'waiting',
       gameStatus: data['gameStatus'] ?? 'notStarted',
@@ -42,7 +43,8 @@ class MatchEvent {
       'teamId': teamId,
       'teamName': teamName,
       'date': date,
-      'time': time,
+      'startTime': startTime, // ✅ 추가
+      'endTime': endTime, // ✅ 추가
       'location': location,
       'recruitStatus': recruitStatus,
       'gameStatus': gameStatus,

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-// 각 탭별 페이지 import
-import 'home/home_page.dart';
+// 페이지 import
+import 'home/home_tab.dart';
 import 'schedule/schedule_page.dart';
-import 'match/match_page.dart';
-// import 'profile/profile_page.dart';  // ❌ 기존 프로필 페이지는 주석 처리
-import 'my/my_page.dart'; // ✅ MyPage로 교체
+import 'profile/profile_page.dart';
+import 'auth/login_page.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -15,45 +15,52 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
-  int _selectedIndex = 0;
+  int _currentIndex = 0;
 
-  // ✅ 각 탭에 연결할 페이지 리스트
-  final List<Widget> _pages = const [
-    HomePage(),
-    SchedulePage(), // 일정 탭
-    MatchPage(), // 매치 탭
-    MyPage(), // ✅ My 탭으로 교체
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-      // 🔥 디버깅용 로그
-      debugPrint('✅ 탭 변경: index=$index');
-    });
-  }
+  final List<Widget> _tabs = const [HomeTab(), SchedulePage(), ProfilePage()];
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    // 🔐 로그인 안 되어 있으면 로그인 페이지로
+    if (user == null) return const LoginPage();
+
     return Scaffold(
-      body: _pages[_selectedIndex],
+      appBar: AppBar(
+        title: const Text('지구공'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  (route) => false,
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      body: _tabs[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+        currentIndex: _currentIndex,
         selectedItemColor: Colors.deepPurple,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed, // 아이콘이 4개라 fixed로
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: '홈'),
           BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
+            icon: Icon(Icons.calendar_month),
             label: '일정',
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.sports_soccer), label: '매치'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'My', // ✅ 라벨 변경
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: '내 정보'),
         ],
       ),
     );

@@ -6,10 +6,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../profile/profile_edit_page.dart';
 
 // ✅ 관리 페이지들
-import '../finance/fee_management_page.dart';
+import '../finance/transaction_management_page.dart';
 import '../reservations/reservation_management_page.dart';
 import '../notices/notice_management_page.dart';
 import '../votes/vote_management_page.dart';
+import '../finance/fee_management_page.dart';
 
 class MyPage extends StatelessWidget {
   const MyPage({super.key});

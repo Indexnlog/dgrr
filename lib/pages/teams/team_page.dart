@@ -30,15 +30,17 @@ class _TeamPageState extends State<TeamPage> {
     Color pickerColor = initialData != null && initialData['teamColor'] != null
         ? _hexToColor(initialData['teamColor'])
         : Colors.blue;
+
     final nameCtrl = TextEditingController(
       text: initialData != null ? initialData['name'] : '',
     );
-    final managerCtrl = TextEditingController(
-      text: initialData != null ? initialData['managerName'] : '',
+    final captainCtrl = TextEditingController(
+      text: initialData != null ? initialData['captainName'] : '',
     );
     final contactCtrl = TextEditingController(
-      text: initialData != null ? initialData['managerContact'] : '',
+      text: initialData != null ? initialData['captainContact'] : '',
     );
+
     File? logoFile;
     String logoUrl = initialData != null ? (initialData['logoUrl'] ?? '') : '';
 
@@ -79,8 +81,8 @@ class _TeamPageState extends State<TeamPage> {
 
               final data = {
                 'name': nameCtrl.text.trim(),
-                'managerName': managerCtrl.text.trim(),
-                'managerContact': contactCtrl.text.trim(),
+                'captainName': captainCtrl.text.trim(),
+                'captainContact': contactCtrl.text.trim(),
                 'teamColor': _colorToHex(pickerColor),
                 'logoUrl': newLogoUrl,
                 'memo': initialData?['memo'] ?? '',
@@ -88,21 +90,26 @@ class _TeamPageState extends State<TeamPage> {
                     initialData?['records'] ??
                     {'wins': 0, 'draws': 0, 'losses': 0},
                 'createdAt': initialData?['createdAt'] ?? Timestamp.now(),
+                'isOurTeam': initialData?['isOurTeam'] ?? false,
               };
 
               if (teamId == null) {
                 await FirebaseFirestore.instance.collection('teams').add(data);
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('팀이 등록되었습니다!')));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('팀이 등록되었습니다!')));
+                }
               } else {
                 await FirebaseFirestore.instance
                     .collection('teams')
                     .doc(teamId)
                     .update(data);
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('팀 정보가 수정되었습니다!')));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('팀 정보가 수정되었습니다!')),
+                  );
+                }
               }
 
               if (mounted) Navigator.pop(ctx);
@@ -125,17 +132,18 @@ class _TeamPageState extends State<TeamPage> {
                     ),
                     const SizedBox(height: 8),
                     TextField(
-                      controller: managerCtrl,
-                      decoration: const InputDecoration(labelText: '담당자 이름'),
+                      controller: captainCtrl,
+                      decoration: const InputDecoration(labelText: '주장 이름'),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: contactCtrl,
-                      decoration: const InputDecoration(labelText: '담당자 연락처'),
+                      decoration: const InputDecoration(labelText: '주장 연락처'),
                       keyboardType: TextInputType.phone,
                     ),
                     const SizedBox(height: 16),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         const Text('팀 컬러:'),
                         const SizedBox(width: 8),
@@ -147,14 +155,23 @@ class _TeamPageState extends State<TeamPage> {
                                 return AlertDialog(
                                   title: const Text('팀 컬러 선택'),
                                   content: SingleChildScrollView(
-                                    child: ColorPicker(
+                                    child: BlockPicker(
                                       pickerColor: pickerColor,
+                                      availableColors: const [
+                                        Colors.red,
+                                        Colors.orange,
+                                        Colors.yellow,
+                                        Colors.green,
+                                        Colors.blue,
+                                        Colors.purple,
+                                        Colors.black,
+                                        Colors.grey,
+                                      ],
                                       onColorChanged: (c) {
                                         setStateModal(() {
                                           pickerColor = c;
                                         });
                                       },
-                                      enableAlpha: false,
                                     ),
                                   ),
                                   actions: [
@@ -246,8 +263,8 @@ class _TeamPageState extends State<TeamPage> {
               final teamColor = _hexToColor(data['teamColor']);
               final logoUrl = data['logoUrl'] ?? '';
               final name = data['name'] ?? '';
-              final managerName = data['managerName'] ?? '';
-              final managerContact = data['managerContact'] ?? '';
+              final captainName = data['captainName'] ?? '';
+              final captainContact = data['captainContact'] ?? '';
               final records = data['records'] as Map<String, dynamic>? ?? {};
               final wins = records['wins'] ?? 0;
               final draws = records['draws'] ?? 0;
@@ -343,8 +360,8 @@ class _TeamPageState extends State<TeamPage> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (managerName.isNotEmpty)
-                          Text('담당자: $managerName (${managerContact})'),
+                        if (captainName.isNotEmpty)
+                          Text('주장: $captainName (${captainContact})'),
                         Text('전적: $wins승 $draws무 $losses패'),
                       ],
                     ),
