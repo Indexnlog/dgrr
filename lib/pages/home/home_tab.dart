@@ -1,23 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // 날짜 포맷용
 
 class HomeTab extends StatelessWidget {
   const HomeTab({super.key});
 
+  /// ✅ 현재 로그인된 사용자의 teamId를 찾아 해당 team의 members 컬렉션에서 사용자 정보 반환
   Future<Map<String, dynamic>?> _fetchUserData() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return null;
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('members')
-        .doc(uid)
+    // 모든 팀 조회
+    final teamQuery = await FirebaseFirestore.instance
+        .collection('teams')
         .get();
 
-    final data = snapshot.data();
-    if (data == null || data is! Map<String, dynamic>) return null;
-    return data;
+    for (var teamDoc in teamQuery.docs) {
+      final teamId = teamDoc.id;
+
+      final memberDoc = await FirebaseFirestore.instance
+          .collection('teams')
+          .doc(teamId)
+          .collection('members')
+          .doc(uid)
+          .get();
+
+      if (memberDoc.exists) {
+        final data = memberDoc.data();
+        data?['teamId'] = teamId; // teamId도 포함해서 리턴
+        return data;
+      }
+    }
+
+    return null; // 사용자를 포함한 팀이 없음
   }
 
   @override
@@ -33,10 +48,11 @@ class HomeTab extends StatelessWidget {
         }
 
         final userData = snapshot.data!;
-        final name = (userData['name'] ?? '이름 없음').toString();
-        final number = userData['number']?.toString() ?? '';
-        final team = (userData['teamName'] ?? '소속 없음').toString();
-        final photoUrl = (userData['photoUrl'] ?? '').toString();
+        final name = userData['name'] ?? '이름 없음';
+        final number = userData['number'] ?? '';
+        final team = userData['teamName'] ?? '소속 없음';
+        final photoUrl = userData['photoUrl'] ?? '';
+        final teamId = userData['teamId'];
 
         return ListView(
           padding: const EdgeInsets.all(16),
@@ -57,7 +73,7 @@ class HomeTab extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      number.isNotEmpty ? '$name (#$number)' : name,
+                      '$name (#$number)',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -74,16 +90,19 @@ class HomeTab extends StatelessWidget {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            _buildNoticeList(),
+            _buildNoticeList(teamId),
           ],
         );
       },
     );
   }
 
-  Widget _buildNoticeList() {
+  /// ✅ 팀 ID 기반 공지사항 조회
+  Widget _buildNoticeList(String teamId) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
+          .collection('teams')
+          .doc(teamId)
           .collection('notices')
           .orderBy('createdAt', descending: true)
           .limit(3)
@@ -95,9 +114,7 @@ class HomeTab extends StatelessWidget {
 
         return Column(
           children: snap.data!.docs.map((doc) {
-            final data = doc.data();
-            if (data is! Map<String, dynamic>) return const SizedBox.shrink();
-
+            final data = doc.data() as Map<String, dynamic>;
             final title = data['title'] ?? '제목 없음';
             final content = data['content'] ?? '';
             final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
@@ -106,17 +123,17 @@ class HomeTab extends StatelessWidget {
               margin: const EdgeInsets.symmetric(vertical: 6),
               child: ListTile(
                 title: Text(
-                  title.toString(),
+                  title,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: Text(
-                  content.toString().length > 50
-                      ? '${content.toString().substring(0, 50)}...'
-                      : content.toString(),
+                  content.length > 50
+                      ? '${content.substring(0, 50)}...'
+                      : content,
                 ),
                 trailing: createdAt != null
                     ? Text(
-                        DateFormat('MM/dd').format(createdAt),
+                        '${createdAt.month}/${createdAt.day}',
                         style: const TextStyle(fontSize: 12),
                       )
                     : null,

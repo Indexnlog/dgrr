@@ -33,6 +33,9 @@ dependencies:
   # 🌐 날짜 포맷용 로케일 처리
   intl: ^0.18.1 # ✅ 추가된 부분
 
+  #상태관리 
+  provider: ^6.1.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
