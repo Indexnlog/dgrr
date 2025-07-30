@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ClassAddPage extends StatefulWidget {
   const ClassAddPage({super.key});
@@ -9,7 +10,6 @@ class ClassAddPage extends StatefulWidget {
 }
 
 class _ClassAddPageState extends State<ClassAddPage> {
-  final _titleController = TextEditingController();
   final _locationController = TextEditingController();
   final _startTimeController = TextEditingController();
   final _endTimeController = TextEditingController();
@@ -54,8 +54,7 @@ class _ClassAddPageState extends State<ClassAddPage> {
 
   /// 📌 Firestore에 수업 저장
   Future<void> _saveClass() async {
-    if (_titleController.text.isEmpty ||
-        _locationController.text.isEmpty ||
+    if (_locationController.text.isEmpty ||
         _startTimeController.text.isEmpty ||
         _endTimeController.text.isEmpty ||
         _selectedDate == null ||
@@ -67,17 +66,52 @@ class _ClassAddPageState extends State<ClassAddPage> {
       return;
     }
 
-    await FirebaseFirestore.instance.collection('classes').add({
-      'title': _titleController.text.trim(),
-      'location': _locationController.text.trim(),
-      'startTime': _startTimeController.text.trim(),
-      'endTime': _endTimeController.text.trim(),
-      'date': Timestamp.fromDate(_selectedDate!), // ✅ 수업 날짜
-      'registerStart': Timestamp.fromDate(_registerStart!), // ✅ 등록 시작
-      'registerEnd': Timestamp.fromDate(_registerEnd!), // ✅ 등록 종료
-      'status': 'active',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    // ✅ 로그인한 사용자의 teamId 찾기
+    final teamsSnapshot = await FirebaseFirestore.instance
+        .collection('teams')
+        .get();
+
+    String? teamId;
+    for (var doc in teamsSnapshot.docs) {
+      final memberDoc = await doc.reference
+          .collection('members')
+          .doc(uid)
+          .get();
+      if (memberDoc.exists) {
+        teamId = doc.id;
+        break;
+      }
+    }
+
+    if (teamId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('팀 정보를 찾을 수 없습니다')));
+      return;
+    }
+
+    // ✅ 저장
+    await FirebaseFirestore.instance
+        .collection('teams')
+        .doc(teamId)
+        .collection('classes')
+        .add({
+          'teamId': teamId,
+          'date': _selectedDate!.toIso8601String().split('T').first,
+          'startTime': _startTimeController.text.trim(),
+          'endTime': _endTimeController.text.trim(),
+          'location': _locationController.text.trim(),
+          'registerStart': Timestamp.fromDate(_registerStart!),
+          'registerEnd': Timestamp.fromDate(_registerEnd!),
+          'status': 'active',
+          'type': 'lesson',
+          'attendance': {'absent': 0, 'present': 0, 'attendees': []},
+          'comments': [],
+          'createdAt': FieldValue.serverTimestamp(),
+        });
 
     if (mounted) {
       Navigator.pop(context);
@@ -89,7 +123,6 @@ class _ClassAddPageState extends State<ClassAddPage> {
 
   @override
   void dispose() {
-    _titleController.dispose();
     _locationController.dispose();
     _startTimeController.dispose();
     _endTimeController.dispose();
@@ -105,14 +138,6 @@ class _ClassAddPageState extends State<ClassAddPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: '수업명',
-                prefixIcon: Icon(Icons.school),
-              ),
-            ),
-            const SizedBox(height: 12),
             TextField(
               controller: _locationController,
               decoration: const InputDecoration(

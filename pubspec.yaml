@@ -31,10 +31,13 @@ dependencies:
   flutter_colorpicker: ^1.0.3
 
   # 🌐 날짜 포맷용 로케일 처리
-  intl: ^0.18.1 # ✅ 추가된 부분
+  intl: ^0.18.1
 
-  #상태관리 
+  # 📦 상태관리
   provider: ^6.1.5
+
+  # 💾 로컬 저장소
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:

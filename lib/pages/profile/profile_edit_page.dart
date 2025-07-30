@@ -5,9 +5,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
 
-import '../../widgets/custom_text_field.dart'; // 공통 텍스트필드
-import '../../widgets/primary_button.dart'; // 공통 버튼
+import '../../widgets/custom_text_field.dart';
+import '../../widgets/primary_button.dart';
+import '../../providers/team_provider.dart'; // ✅ 팀 ID 접근
 
 class ProfileEditPage extends StatefulWidget {
   final String uid;
@@ -34,7 +36,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   String? _currentPhotoUrl;
   final ImagePicker _picker = ImagePicker();
 
-  // ✅ 입단일 변수
   DateTime? _selectedJoinDate;
 
   @override
@@ -44,7 +45,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 
   Future<void> _loadProfile() async {
+    final teamId = Provider.of<TeamProvider>(context, listen: false).teamId;
     final doc = await FirebaseFirestore.instance
+        .collection('teams')
+        .doc(teamId)
         .collection('members')
         .doc(widget.uid)
         .get();
@@ -103,13 +107,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     }
 
     setState(() => _saving = true);
+    final teamId = Provider.of<TeamProvider>(context, listen: false).teamId;
 
     try {
       final number = int.tryParse(_numberController.text.trim()) ?? 0;
       final uniformName = _uniformNameController.text.trim();
 
-      // 🔹 등번호 중복 체크
+      // 중복 체크
       final numberQuery = await FirebaseFirestore.instance
+          .collection('teams')
+          .doc(teamId)
           .collection('members')
           .where('number', isEqualTo: number)
           .get();
@@ -119,8 +126,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         return;
       }
 
-      // 🔹 유니폼 이름 중복 체크
       final uniformNameQuery = await FirebaseFirestore.instance
+          .collection('teams')
+          .doc(teamId)
           .collection('members')
           .where('uniformName', isEqualTo: uniformName)
           .get();
@@ -140,11 +148,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         'homeAddress': _homeAddressController.text.trim(),
         'workAddress': _workAddressController.text.trim(),
         'department': _department,
-        'joinDate': Timestamp.fromDate(_selectedJoinDate!), // ✅ 수정된 입단일
+        'joinDate': Timestamp.fromDate(_selectedJoinDate!),
       };
       if (photoUrl != null) updateData['photoUrl'] = photoUrl;
 
       await FirebaseFirestore.instance
+          .collection('teams')
+          .doc(teamId)
           .collection('members')
           .doc(widget.uid)
           .update(updateData);
@@ -185,7 +195,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
           key: _formKey,
           child: ListView(
             children: [
-              // ✅ 프로필 이미지
               Center(
                 child: GestureDetector(
                   onTap: _pickImage,
@@ -209,7 +218,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 ),
               ),
               const SizedBox(height: 24),
-
               CustomTextField(
                 controller: _nameController,
                 hintText: '본명',
@@ -217,7 +225,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     (v == null || v.isEmpty) ? '본명을 입력해주세요' : null,
               ),
               const SizedBox(height: 16),
-
               CustomTextField(
                 controller: _uniformNameController,
                 hintText: '유니폼 이름',
@@ -225,14 +232,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     (v == null || v.isEmpty) ? '유니폼 이름을 입력해주세요' : null,
               ),
               const SizedBox(height: 16),
-
               CustomTextField(
                 controller: _numberController,
                 hintText: '등번호',
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
-
               CustomTextField(
                 controller: _phoneController,
                 hintText: '연락처 (숫자만 입력)',
@@ -245,19 +250,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     (v == null || v.isEmpty) ? '연락처를 입력해주세요' : null,
               ),
               const SizedBox(height: 16),
-
               CustomTextField(
                 controller: _homeAddressController,
                 hintText: '자택 주소 (구까지만)',
               ),
               const SizedBox(height: 16),
-
               CustomTextField(
                 controller: _workAddressController,
                 hintText: '직장 주소 (구까지만)',
               ),
               const SizedBox(height: 16),
-
               DropdownButtonFormField<String>(
                 value: _department,
                 items: const [
@@ -273,8 +275,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 decoration: const InputDecoration(labelText: '소속'),
               ),
               const SizedBox(height: 16),
-
-              // ✅ 입단일 선택
               ListTile(
                 tileColor: Colors.grey[100],
                 shape: RoundedRectangleBorder(
@@ -289,7 +289,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                 onTap: _pickJoinDate,
               ),
               const SizedBox(height: 24),
-
               _saving
                   ? const Center(child: CircularProgressIndicator())
                   : PrimaryButton(text: '수정 완료', onPressed: _saveProfile),
@@ -301,7 +300,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 }
 
-/// ✅ 전화번호 자동 하이픈 Formatter
 class _PhoneNumberTextInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(

@@ -46,16 +46,20 @@ class SelectTeamPage extends StatelessWidget {
           return ListView.builder(
             itemCount: teams.length,
             itemBuilder: (context, index) {
-              final team = teams[index];
-              final teamId = team.id;
-              final name = team['name'];
-              final logoUrl = team['logoUrl'];
+              final doc = teams[index];
+              final data = doc.data() as Map<String, dynamic>;
+
+              final teamId = doc.id;
+              final name = data['name'] ?? '이름 없음';
+              final logoUrl = data['logoUrl'];
 
               return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: NetworkImage(logoUrl),
-                  radius: 24,
-                ),
+                leading: logoUrl != null
+                    ? CircleAvatar(
+                        backgroundImage: NetworkImage(logoUrl),
+                        radius: 24,
+                      )
+                    : const CircleAvatar(child: Icon(Icons.group)),
                 title: Text(name),
                 onTap: () => _onTeamSelected(context, teamId),
               );

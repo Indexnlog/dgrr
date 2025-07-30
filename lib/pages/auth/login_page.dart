@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import '../../providers/team_provider.dart';
 import '../main_page.dart';
-import '../profile/profile_setup_page.dart'; // 사용 안 해도 남겨둠
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,15 +18,13 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
 
   Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) {
         setState(() => _isLoading = false);
-        return; // 로그인 취소
+        return;
       }
 
       final googleAuth = await googleUser.authentication;
@@ -50,7 +47,6 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final teamId = context.read<TeamProvider>().teamId;
-
       if (teamId == null || teamId.isEmpty) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(
@@ -59,21 +55,44 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      final userDoc = FirebaseFirestore.instance
+      final memberDocRef = FirebaseFirestore.instance
+          .collection('teams')
+          .doc(teamId)
           .collection('members')
           .doc(user.uid);
-      final docSnapshot = await userDoc.get();
 
-      if (!docSnapshot.exists) {
-        // ✅ 신규 가입자 → Firestore에 멤버 문서 저장
-        await userDoc.set({
+      final memberDoc = await memberDocRef.get();
+
+      if (!memberDoc.exists) {
+        // 신규 멤버 문서 생성 → 승인 대기 상태
+        await memberDocRef.set({
           'uid': user.uid,
           'name': user.displayName,
           'email': user.email,
           'photoUrl': user.photoURL,
           'teamId': teamId,
-          'createdAt': FieldValue.serverTimestamp(),
+          'status': 'pending', // 🔸 승인 대기
+          'role': 'member',
+          'joinedAt': FieldValue.serverTimestamp(),
         });
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('가입 신청 완료! 승인을 기다려주세요.')));
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final data = memberDoc.data();
+      final status = data?['status'];
+
+      if (status != 'active') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('현재 상태: $status. 승인 후 이용 가능합니다.')),
+        );
+        setState(() => _isLoading = false);
+        return;
       }
 
       if (!mounted) return;
