@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/pages/class/class_list_page.dart';
-import 'package:flutter_application_1/pages/class/class_add_page.dart';
+import 'package:flutter_application_1/pages/classes/class_list_page.dart';
+import 'package:flutter_application_1/pages/classes/class_add_page.dart';
 
 class ClassPage extends StatelessWidget {
   const ClassPage({super.key});

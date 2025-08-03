@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 // 페이지 import
 import 'home/home_tab.dart';
-import 'schedule/schedule_page.dart';
+import 'schedules/schedule_page.dart';
 import 'profile/profile_page.dart';
 import 'auth/login_page.dart';
 

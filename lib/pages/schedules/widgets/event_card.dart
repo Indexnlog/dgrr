@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../models/schedule_event_model.dart';
+import '../../../models/schedule/schedule_event_model.dart';
 import '../schedule_detail_page.dart';
 
 class EventCard extends StatelessWidget {

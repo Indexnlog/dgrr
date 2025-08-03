@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/models/reservation_model.dart';
+import 'package:flutter_application_1/models/reservation/reservation_model.dart';
 import 'package:intl/intl.dart';
 
 class ReservationDetailPage extends StatelessWidget {

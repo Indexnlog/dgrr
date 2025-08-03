@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:flutter_application_1/models/reservation_model.dart';
+import 'package:flutter_application_1/models/reservation/reservation_model.dart';
 import 'package:flutter_application_1/pages/reservations/reservation_detail_page.dart';
 
 class ReservationListPage extends StatefulWidget {

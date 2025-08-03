@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:flutter_application_1/models/class_model.dart'; // ⚠️ 경로 확인
-import 'package:flutter_application_1/pages/class/class_detail_page.dart'; // ✅ 상세 페이지 import
+import 'package:flutter_application_1/models/class/class_model.dart'; // ⚠️ 경로 확인
+import 'package:flutter_application_1/pages/classes/class_detail_page.dart'; // ✅ 상세 페이지 import
 import 'package:flutter_application_1/services/firestore/schedule_service.dart'; // ✅ 확정 함수 import
 
 class ClassListPage extends StatefulWidget {

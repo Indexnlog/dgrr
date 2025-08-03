@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:flutter_application_1/models/class_model.dart'; // 모델 경로에 맞게 수정
+import 'package:flutter_application_1/models/class/class_model.dart'; // 모델 경로에 맞게 수정
 
 class ClassDetailPage extends StatefulWidget {
   final ClassModel classModel;

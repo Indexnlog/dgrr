@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
-import '../../models/match_event_model.dart';
+import '../../models/match/match_event_model.dart';
 import 'widgets/round_selector.dart';
 import 'widgets/record_buttons.dart';
 import 'widgets/record_modals.dart';
@@ -91,7 +91,6 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 상단 정보
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -122,6 +121,7 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
                           'startTime': null,
                           'endTime': null,
                           'score': {'home': 0, 'away': 0},
+                          'createdAt': Timestamp.now(),
                         });
                       },
                     ),
@@ -129,8 +129,6 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
                 ),
               ),
               const Divider(height: 1),
-
-              // 라운드 선택 위젯
               RoundSelector(
                 matchId: widget.event.id,
                 teamId: widget.event.teamId,
@@ -138,8 +136,6 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
                   setState(() => selectedRoundId = roundId);
                 },
               ),
-
-              // 라운드 상세 및 기록
               if (selectedRoundId != null) _buildRoundSection(matchRef),
             ],
           );
@@ -169,7 +165,6 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 상태 버튼
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -215,8 +210,6 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
                   ],
                 ),
               ),
-
-              // 타이머 & 시작 시간
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -242,8 +235,6 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
                   ],
                 ),
               ),
-
-              // 기록 추가 버튼
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: RecordButtons(
@@ -265,8 +256,6 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
                   },
                 ),
               ),
-
-              // 기록 리스트
               Expanded(
                 child: RecordList(
                   teamId: widget.event.teamId,

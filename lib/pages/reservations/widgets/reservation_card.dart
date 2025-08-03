@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_application_1/models/reservation_model.dart';
+import 'package:flutter_application_1/models/reservation/reservation_model.dart';
 
 class ReservationCard extends StatelessWidget {
   final ReservationModel reservation;
