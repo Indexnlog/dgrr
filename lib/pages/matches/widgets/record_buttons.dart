@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 
 class RecordButtons extends StatelessWidget {
-  final VoidCallback onAddGoal;
-  final VoidCallback onAddChange;
+  final VoidCallback? onAddGoal;
+  final VoidCallback? onAddChange;
 
-  const RecordButtons({
-    super.key,
-    required this.onAddGoal,
-    required this.onAddChange,
-  });
+  const RecordButtons({super.key, this.onAddGoal, this.onAddChange});
 
   @override
   Widget build(BuildContext context) {

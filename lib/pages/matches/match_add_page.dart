@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
-import '../../providers/user_role_provider.dart'; // ✅ UserRoleProvider 임포트
+import '../../providers/user_role_provider.dart';
 
 class MatchAddPage extends StatefulWidget {
   final String teamId;
@@ -15,14 +15,23 @@ class MatchAddPage extends StatefulWidget {
 }
 
 class _MatchAddPageState extends State<MatchAddPage> {
-  final _teamNameController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _startTimeController = TextEditingController();
-  final _endTimeController = TextEditingController();
+  late final TextEditingController _teamNameController;
+  late final TextEditingController _locationController;
+  late final TextEditingController _startTimeController;
+  late final TextEditingController _endTimeController;
 
   DateTime? _selectedDate;
   DateTime? _registerStart;
   DateTime? _registerEnd;
+
+  @override
+  void initState() {
+    super.initState();
+    _teamNameController = TextEditingController();
+    _locationController = TextEditingController();
+    _startTimeController = TextEditingController();
+    _endTimeController = TextEditingController();
+  }
 
   @override
   void dispose() {
@@ -33,7 +42,10 @@ class _MatchAddPageState extends State<MatchAddPage> {
     super.dispose();
   }
 
-  Future<void> _pickDate(BuildContext context, bool isRegisterStart) async {
+  Future<void> _pickDate(
+    BuildContext context,
+    void Function(DateTime) onPicked,
+  ) async {
     final picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -41,27 +53,7 @@ class _MatchAddPageState extends State<MatchAddPage> {
       lastDate: DateTime(2030),
     );
     if (picked != null) {
-      setState(() {
-        if (isRegisterStart) {
-          _registerStart = picked;
-        } else {
-          _registerEnd = picked;
-        }
-      });
-    }
-  }
-
-  Future<void> _pickMatchDate(BuildContext context) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      setState(() => onPicked(picked));
     }
   }
 
@@ -115,6 +107,8 @@ class _MatchAddPageState extends State<MatchAddPage> {
       );
     }
 
+    final dateFormat = DateFormat('yyyy-MM-dd');
+
     return Scaffold(
       appBar: AppBar(title: const Text('➕ 매치 등록')),
       body: SingleChildScrollView(
@@ -159,11 +153,12 @@ class _MatchAddPageState extends State<MatchAddPage> {
                   child: Text(
                     _selectedDate == null
                         ? '📅 매치 날짜 선택 안됨'
-                        : '매치 날짜: ${_selectedDate!.toLocal()}',
+                        : '매치 날짜: ${dateFormat.format(_selectedDate!)}',
                   ),
                 ),
                 TextButton(
-                  onPressed: () => _pickMatchDate(context),
+                  onPressed: () =>
+                      _pickDate(context, (picked) => _selectedDate = picked),
                   child: const Text('매치 날짜 선택'),
                 ),
               ],
@@ -174,11 +169,12 @@ class _MatchAddPageState extends State<MatchAddPage> {
                   child: Text(
                     _registerStart == null
                         ? '📅 등록 시작일 선택 안됨'
-                        : '등록 시작: ${_registerStart!.toLocal()}',
+                        : '등록 시작: ${dateFormat.format(_registerStart!)}',
                   ),
                 ),
                 TextButton(
-                  onPressed: () => _pickDate(context, true),
+                  onPressed: () =>
+                      _pickDate(context, (picked) => _registerStart = picked),
                   child: const Text('등록 시작일'),
                 ),
               ],
@@ -189,11 +185,12 @@ class _MatchAddPageState extends State<MatchAddPage> {
                   child: Text(
                     _registerEnd == null
                         ? '📅 등록 종료일 선택 안됨'
-                        : '등록 종료: ${_registerEnd!.toLocal()}',
+                        : '등록 종료: ${dateFormat.format(_registerEnd!)}',
                   ),
                 ),
                 TextButton(
-                  onPressed: () => _pickDate(context, false),
+                  onPressed: () =>
+                      _pickDate(context, (picked) => _registerEnd = picked),
                   child: const Text('등록 종료일'),
                 ),
               ],

@@ -28,6 +28,7 @@ String eventTypeToString(EventType type) {
 class MatchEventModel {
   final String id;
   final String teamId;
+  final String teamName; // ✅ 추가됨
   final String title;
   final String description;
   final EventType eventType;
@@ -47,6 +48,7 @@ class MatchEventModel {
   MatchEventModel({
     required this.id,
     required this.teamId,
+    required this.teamName,
     required this.title,
     required this.description,
     required this.eventType,
@@ -70,6 +72,7 @@ class MatchEventModel {
     return MatchEventModel(
       id: doc.id,
       teamId: data['teamId'] ?? '',
+      teamName: data['teamName'] ?? '', // ✅ 추가됨
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       eventType: eventTypeFromString(data['eventType'] ?? ''),
@@ -95,6 +98,7 @@ class MatchEventModel {
   Map<String, dynamic> toMap() {
     return {
       'teamId': teamId,
+      'teamName': teamName, // ✅ 추가됨
       'title': title,
       'description': description,
       'eventType': eventTypeToString(eventType),
@@ -122,6 +126,7 @@ class MatchEventModel {
     return MatchEventModel(
       id: id,
       teamId: teamId,
+      teamName: teamName, // ✅ 유지
       title: title ?? this.title,
       description: description,
       eventType: eventType,
