@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+
 import '../../models/match_event_model.dart';
 import 'widgets/round_selector.dart';
 import 'widgets/record_buttons.dart';
@@ -20,9 +21,9 @@ class MatchDetailPage extends StatefulWidget {
 
 class _MatchDetailPageState extends State<MatchDetailPage> {
   String? selectedRoundId;
-  DateTime? roundStartTime;
   Timer? _timer;
   int elapsedSeconds = 0;
+  DateTime? roundStartTime;
 
   @override
   void dispose() {
@@ -33,12 +34,32 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
   void _startTimer(DateTime start) {
     _timer?.cancel();
     roundStartTime = start;
-    elapsedSeconds = DateTime.now().difference(start).inSeconds;
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    int diff = DateTime.now().difference(start).inSeconds;
+    elapsedSeconds = diff < 0 ? 0 : diff;
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
-        elapsedSeconds = DateTime.now().difference(roundStartTime!).inSeconds;
+        int newDiff = DateTime.now().difference(roundStartTime!).inSeconds;
+        elapsedSeconds = newDiff < 0 ? 0 : newDiff;
       });
     });
+  }
+
+  void _startTimerIfNeeded(String status, Timestamp? startTimeTS) {
+    if (status == 'inProgress' && startTimeTS != null) {
+      final startTime = startTimeTS.toDate();
+      if (_timer == null || !_timer!.isActive) {
+        _startTimer(startTime);
+      }
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+
+    if (status == 'finished') {
+      _timer?.cancel();
+      _timer = null;
+    }
   }
 
   String _formatDuration(Duration d) {
@@ -48,18 +69,22 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final matchRef = FirebaseFirestore.instance
+        .collection('teams')
+        .doc(widget.event.teamId)
+        .collection('matches')
+        .doc(widget.event.id);
+
     return Scaffold(
       appBar: AppBar(title: Text('📋 ${widget.event.teamName}')),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('matches')
-            .doc(widget.event.id)
-            .snapshots(),
-        builder: (context, snap) {
-          if (!snap.hasData) {
+        stream: matchRef.snapshots(),
+        builder: (context, matchSnap) {
+          if (!matchSnap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final data = snap.data!.data() as Map<String, dynamic>;
+
+          final data = matchSnap.data!.data() as Map<String, dynamic>;
           final participants = (data['participants'] ?? []) as List;
           final recruitStatus = data['recruitStatus'] ?? 'waiting';
 
@@ -72,7 +97,17 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('모집 상태: $recruitStatus'),
+                    Text(
+                      recruitStatus == 'confirmed'
+                          ? '✅ 경기 확정됨'
+                          : '⏳ 상대팀 미정 / 인원 미달',
+                      style: TextStyle(
+                        color: recruitStatus == 'confirmed'
+                            ? Colors.green
+                            : Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     Text('참석자 수: ${participants.length} 명'),
                     const SizedBox(height: 8),
                     TeamSelectButton(matchId: widget.event.id),
@@ -81,11 +116,7 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
                       icon: const Icon(Icons.add),
                       label: const Text('라운드 추가'),
                       onPressed: () async {
-                        final newDoc = FirebaseFirestore.instance
-                            .collection('matches')
-                            .doc(widget.event.id)
-                            .collection('rounds')
-                            .doc();
+                        final newDoc = matchRef.collection('rounds').doc();
                         await newDoc.set({
                           'status': 'notStarted',
                           'startTime': null,
@@ -99,152 +130,154 @@ class _MatchDetailPageState extends State<MatchDetailPage> {
               ),
               const Divider(height: 1),
 
-              // 라운드 선택
+              // 라운드 선택 위젯
               RoundSelector(
                 matchId: widget.event.id,
+                teamId: widget.event.teamId,
                 onSelected: (roundId) {
                   setState(() => selectedRoundId = roundId);
                 },
               ),
 
-              if (selectedRoundId != null) ...[
-                // 라운드 상태 관리
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: StreamBuilder<DocumentSnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('matches')
-                        .doc(widget.event.id)
-                        .collection('rounds')
-                        .doc(selectedRoundId!)
-                        .snapshots(),
-                    builder: (context, roundSnap) {
-                      if (!roundSnap.hasData || !roundSnap.data!.exists) {
-                        return const SizedBox();
-                      }
-                      final roundData =
-                          roundSnap.data!.data() as Map<String, dynamic>;
-                      final status = roundData['status'] ?? 'notStarted';
-                      final startTimeTS = roundData['startTime'] as Timestamp?;
-                      final startTime = startTimeTS?.toDate();
-                      if (startTime != null && status == 'inProgress') {
-                        _startTimer(startTime);
-                      } else if (status != 'inProgress') {
-                        _timer?.cancel();
-                      }
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              ElevatedButton.icon(
-                                icon: const Icon(Icons.play_arrow),
-                                label: const Text('라운드 시작'),
-                                onPressed: status == 'notStarted'
-                                    ? () async {
-                                        final now = DateTime.now();
-                                        await MatchService.updateRoundStatus(
-                                          widget.event.id,
-                                          selectedRoundId!,
-                                          'inProgress',
-                                        );
-                                        await FirebaseFirestore.instance
-                                            .collection('matches')
-                                            .doc(widget.event.id)
-                                            .collection('rounds')
-                                            .doc(selectedRoundId!)
-                                            .update({
-                                              'startTime': Timestamp.fromDate(
-                                                now,
-                                              ),
-                                            });
-                                      }
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              ElevatedButton.icon(
-                                icon: const Icon(Icons.stop),
-                                label: const Text('라운드 종료'),
-                                onPressed: status == 'inProgress'
-                                    ? () async {
-                                        await MatchService.updateRoundStatus(
-                                          widget.event.id,
-                                          selectedRoundId!,
-                                          'finished',
-                                        );
-                                        await FirebaseFirestore.instance
-                                            .collection('matches')
-                                            .doc(widget.event.id)
-                                            .collection('rounds')
-                                            .doc(selectedRoundId!)
-                                            .update({
-                                              'endTime': Timestamp.now(),
-                                            });
-                                      }
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(child: Text('상태: $status')),
-                            ],
-                          ),
-                          if (startTime != null) ...[
-                            Text(
-                              '시작: ${DateFormat('HH:mm:ss').format(startTime)}',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                          if (status == 'inProgress' && roundStartTime != null)
-                            Text(
-                              '경과: ${_formatDuration(Duration(seconds: elapsedSeconds))}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.red,
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-
-                // 득점/교체 기록 버튼
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: RecordButtons(
-                    onAddGoal: () {
-                      showRecordGoalModal(
-                        context,
-                        widget.event.id,
-                        selectedRoundId!,
-                      );
-                    },
-                    onAddChange: () {
-                      showRecordChangeModal(
-                        context,
-                        widget.event.id,
-                        selectedRoundId!,
-                      );
-                    },
-                  ),
-                ),
-
-                // 기록 리스트
-                Expanded(
-                  child: RecordList(
-                    matchId: widget.event.id,
-                    roundId: selectedRoundId!,
-                  ),
-                ),
-              ],
+              // 라운드 상세 및 기록
+              if (selectedRoundId != null) _buildRoundSection(matchRef),
             ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildRoundSection(DocumentReference matchRef) {
+    final roundRef = matchRef.collection('rounds').doc(selectedRoundId!);
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: roundRef.snapshots(),
+      builder: (context, roundSnap) {
+        if (!roundSnap.hasData || !roundSnap.data!.exists) {
+          return const SizedBox.shrink();
+        }
+
+        final round = roundSnap.data!.data() as Map<String, dynamic>;
+        final status = round['status'] ?? 'notStarted';
+        final startTimeTS = round['startTime'] as Timestamp?;
+        final startTime = startTimeTS?.toDate();
+
+        _startTimerIfNeeded(status, startTimeTS);
+
+        return Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 상태 버튼
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('라운드 시작'),
+                      onPressed: status == 'notStarted'
+                          ? () async {
+                              final now = DateTime.now();
+                              await MatchService.updateRoundStatus(
+                                widget.event.teamId,
+                                widget.event.id,
+                                selectedRoundId!,
+                                'inProgress',
+                              );
+                              await roundRef.update({
+                                'startTime': Timestamp.fromDate(now),
+                              });
+                            }
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.stop),
+                      label: const Text('라운드 종료'),
+                      onPressed: status == 'inProgress'
+                          ? () async {
+                              await MatchService.updateRoundStatus(
+                                widget.event.teamId,
+                                widget.event.id,
+                                selectedRoundId!,
+                                'finished',
+                              );
+                              await roundRef.update({
+                                'endTime': Timestamp.now(),
+                              });
+                            }
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('상태: $status')),
+                  ],
+                ),
+              ),
+
+              // 타이머 & 시작 시간
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (startTime != null)
+                      Text(
+                        '시작: ${DateFormat('HH:mm:ss').format(startTime)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    if (status == 'inProgress' && roundStartTime != null)
+                      Text(
+                        '경과: ${_formatDuration(Duration(seconds: elapsedSeconds))}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.red,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // 기록 추가 버튼
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: RecordButtons(
+                  onAddGoal: () {
+                    showRecordGoalModal(
+                      context,
+                      widget.event.teamId,
+                      widget.event.id,
+                      selectedRoundId!,
+                    );
+                  },
+                  onAddChange: () {
+                    showRecordChangeModal(
+                      context,
+                      widget.event.teamId,
+                      widget.event.id,
+                      selectedRoundId!,
+                    );
+                  },
+                ),
+              ),
+
+              // 기록 리스트
+              Expanded(
+                child: RecordList(
+                  teamId: widget.event.teamId,
+                  matchId: widget.event.id,
+                  roundId: selectedRoundId!,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

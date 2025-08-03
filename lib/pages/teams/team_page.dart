@@ -31,18 +31,16 @@ class _TeamPageState extends State<TeamPage> {
         ? _hexToColor(initialData['teamColor'])
         : Colors.blue;
 
-    final nameCtrl = TextEditingController(
-      text: initialData != null ? initialData['name'] : '',
-    );
+    final nameCtrl = TextEditingController(text: initialData?['name'] ?? '');
     final captainCtrl = TextEditingController(
-      text: initialData != null ? initialData['captainName'] : '',
+      text: initialData?['captainName'] ?? '',
     );
     final contactCtrl = TextEditingController(
-      text: initialData != null ? initialData['captainContact'] : '',
+      text: initialData?['captainContact'] ?? '',
     );
 
     File? logoFile;
-    String logoUrl = initialData != null ? (initialData['logoUrl'] ?? '') : '';
+    String logoUrl = initialData?['logoUrl'] ?? '';
 
     showModalBottomSheet(
       context: context,
@@ -62,11 +60,27 @@ class _TeamPageState extends State<TeamPage> {
             }
 
             Future<void> _saveTeam() async {
-              if (nameCtrl.text.trim().isEmpty) {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
                 ScaffoldMessenger.of(
                   context,
                 ).showSnackBar(const SnackBar(content: Text('팀 이름을 입력하세요')));
                 return;
+              }
+
+              if (teamId == null) {
+                final dupCheck = await FirebaseFirestore.instance
+                    .collection('teams')
+                    .where('name', isEqualTo: name)
+                    .get();
+                if (dupCheck.docs.isNotEmpty) {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('이미 존재하는 팀 이름입니다')),
+                  );
+                  return;
+                }
               }
 
               String newLogoUrl = logoUrl;
@@ -80,7 +94,7 @@ class _TeamPageState extends State<TeamPage> {
               }
 
               final data = {
-                'name': nameCtrl.text.trim(),
+                'name': name,
                 'captainName': captainCtrl.text.trim(),
                 'captainContact': contactCtrl.text.trim(),
                 'teamColor': _colorToHex(pickerColor),
@@ -319,6 +333,15 @@ class _TeamPageState extends State<TeamPage> {
                       ),
                     );
                     if (confirm == true) {
+                      final logoUrl = data['logoUrl'];
+                      if (logoUrl != null && logoUrl.toString().isNotEmpty) {
+                        try {
+                          final ref = FirebaseStorage.instance.refFromURL(
+                            logoUrl,
+                          );
+                          await ref.delete();
+                        } catch (_) {}
+                      }
                       await FirebaseFirestore.instance
                           .collection('teams')
                           .doc(doc.id)
@@ -365,6 +388,9 @@ class _TeamPageState extends State<TeamPage> {
                         Text('전적: $wins승 $draws무 $losses패'),
                       ],
                     ),
+                    trailing: data['isOurTeam'] == true
+                        ? const Icon(Icons.star, color: Colors.amber)
+                        : null,
                   ),
                 ),
               );

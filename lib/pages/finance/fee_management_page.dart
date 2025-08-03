@@ -23,20 +23,46 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
   double total = 0;
   double monthTotal = 0;
 
-  bool get isAdmin {
-    const adminUids = ['YOUR_ADMIN_UID']; // ✅ 관리자 UID 지정
-    return adminUids.contains(FirebaseAuth.instance.currentUser?.uid);
-  }
+  String? _teamId;
+  bool isManager = false;
+  bool isTreasurer = false;
+
+  CollectionReference get _feeCollection => _teamId == null
+      ? _firestore.collection('null') // 임시
+      : _firestore.collection('teams').doc(_teamId).collection('regular_fees');
 
   @override
   void initState() {
     super.initState();
-    _loadAvailableMonths();
-    _calculateTotals();
+    _loadTeamIdAndRole();
+  }
+
+  Future<void> _loadTeamIdAndRole() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final teamsSnapshot = await _firestore.collection('teams').get();
+    for (var doc in teamsSnapshot.docs) {
+      final memberDoc = await doc.reference
+          .collection('members')
+          .doc(uid)
+          .get();
+      if (memberDoc.exists) {
+        final role = memberDoc['role'] ?? '';
+        setState(() {
+          _teamId = doc.id;
+          isManager = (role == 'manager');
+          isTreasurer = (role == 'treasurer');
+        });
+        _loadAvailableMonths();
+        _calculateTotals();
+        return;
+      }
+    }
   }
 
   Future<void> _loadAvailableMonths() async {
-    final snapshot = await _firestore.collection('regular_fees').get();
+    final snapshot = await _feeCollection.get();
     final months = <String>{};
     for (var doc in snapshot.docs) {
       final ts = (doc['date'] as Timestamp).toDate();
@@ -51,12 +77,12 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
   }
 
   Future<void> _calculateTotals() async {
-    final snapshot = await _firestore.collection('regular_fees').get();
+    final snapshot = await _feeCollection.get();
     double totalSum = 0;
     double monthlySum = 0;
 
     for (var doc in snapshot.docs) {
-      final data = doc.data();
+      final data = doc.data() as Map<String, dynamic>;
       final ts = (data['date'] as Timestamp).toDate();
       final ym = "${ts.year}-${ts.month.toString().padLeft(2, '0')}";
       final amt = (data['amount'] as num).toDouble();
@@ -65,21 +91,28 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
       if (ym == selectedYearMonth) monthlySum += amt;
     }
 
-    setState(() {
-      total = totalSum;
-      monthTotal = monthlySum;
-    });
+    if (mounted) {
+      setState(() {
+        total = totalSum;
+        monthTotal = monthlySum;
+      });
+    }
   }
 
   Future<void> _addFee() async {
-    final amount = int.tryParse(_amountController.text);
+    if (_teamId == null) return;
+    final amount = int.tryParse(_amountController.text.trim());
     if (amount == null) return;
-    await _firestore.collection('regular_fees').add({
+
+    await _feeCollection.add({
+      'teamId': _teamId,
       'date': Timestamp.fromDate(selectedDate),
       'amount': amount,
-      'memo': _memoController.text,
-      'createdBy': FirebaseAuth.instance.currentUser!.uid,
+      'memo': _memoController.text.trim(),
+      'createdBy': FirebaseAuth.instance.currentUser?.uid ?? '',
+      'createdAt': Timestamp.now(),
     });
+
     _amountController.clear();
     _memoController.clear();
     _calculateTotals();
@@ -87,7 +120,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
   }
 
   Future<void> _deleteFee(String docId) async {
-    await _firestore.collection('regular_fees').doc(docId).delete();
+    await _feeCollection.doc(docId).delete();
     _calculateTotals();
     _loadAvailableMonths();
   }
@@ -99,6 +132,10 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
       decimalDigits: 0,
     );
 
+    if (_teamId == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('💸 정기 회비 관리')),
       body: SingleChildScrollView(
@@ -106,7 +143,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // === 상단 요약 ===
+            // 월 선택
             Row(
               children: [
                 const Text('📅 월 선택:'),
@@ -118,9 +155,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
                   }).toList(),
                   onChanged: (val) {
                     if (val == null) return;
-                    setState(() {
-                      selectedYearMonth = val;
-                    });
+                    setState(() => selectedYearMonth = val);
                     _calculateTotals();
                   },
                 ),
@@ -137,10 +172,9 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
             ),
             const Divider(height: 32),
 
-            // === 회비 리스트 ===
+            // 회비 리스트
             StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('regular_fees')
+              stream: _feeCollection
                   .orderBy('date', descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
@@ -172,7 +206,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            if (isAdmin)
+                            if (isManager || isTreasurer)
                               IconButton(
                                 icon: const Icon(
                                   Icons.delete,
@@ -190,14 +224,16 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
             ),
             const Divider(height: 32),
 
-            // === 회비 추가 입력 ===
-            if (isAdmin) ...[
+            // 회비 추가
+            if (isManager || isTreasurer) ...[
               Text('➕ 회비 추가', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
               TextField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: '금액'),
               ),
+              const SizedBox(height: 8),
               TextField(
                 controller: _memoController,
                 decoration: const InputDecoration(labelText: '메모 (선택)'),

@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../providers/team_provider.dart';
 
 class NoticeCreatePage extends StatefulWidget {
   const NoticeCreatePage({super.key});
@@ -44,6 +47,8 @@ class _NoticeCreatePageState extends State<NoticeCreatePage> {
   Future<void> _saveNotice() async {
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
+    final teamId = Provider.of<TeamProvider>(context, listen: false).teamId;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
 
     if (title.isEmpty || content.isEmpty) {
       ScaffoldMessenger.of(
@@ -52,26 +57,29 @@ class _NoticeCreatePageState extends State<NoticeCreatePage> {
       return;
     }
 
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
+    if (uid == null || teamId == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('로그인 정보가 없습니다.')));
+      ).showSnackBar(const SnackBar(content: Text('로그인 또는 팀 정보가 없습니다.')));
       return;
     }
 
     try {
-      await FirebaseFirestore.instance.collection('posts').add({
-        'title': title,
-        'content': content,
-        'isPinned': _isPinned,
-        'publishAt': _publishAt != null
-            ? Timestamp.fromDate(_publishAt!)
-            : Timestamp.now(),
-        'authorId': uid,
-        'category': '공지',
-        'createdAt': Timestamp.now(),
-      });
+      await FirebaseFirestore.instance
+          .collection('teams')
+          .doc(teamId)
+          .collection('notices')
+          .add({
+            'teamId': teamId,
+            'title': title,
+            'content': content,
+            'isPinned': _isPinned,
+            'publishAt': _publishAt != null
+                ? Timestamp.fromDate(_publishAt!)
+                : Timestamp.now(),
+            'authorId': uid,
+            'createdAt': Timestamp.now(),
+          });
 
       if (mounted) {
         ScaffoldMessenger.of(

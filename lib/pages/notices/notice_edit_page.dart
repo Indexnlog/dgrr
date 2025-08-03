@@ -2,8 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class NoticeEditPage extends StatefulWidget {
-  final String postId; // 관리 페이지에서 넘겨주는 문서 ID
-  const NoticeEditPage({super.key, required this.postId});
+  final String teamId;
+  final String noticeId;
+  const NoticeEditPage({
+    super.key,
+    required this.teamId,
+    required this.noticeId,
+  });
 
   @override
   State<NoticeEditPage> createState() => _NoticeEditPageState();
@@ -14,20 +19,21 @@ class _NoticeEditPageState extends State<NoticeEditPage> {
   final _contentController = TextEditingController();
   bool _isPinned = false;
   DateTime? _publishAt;
-
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _fetchPostData();
+    _fetchNoticeData();
   }
 
-  Future<void> _fetchPostData() async {
+  Future<void> _fetchNoticeData() async {
     try {
       final doc = await FirebaseFirestore.instance
-          .collection('posts')
-          .doc(widget.postId)
+          .collection('teams')
+          .doc(widget.teamId)
+          .collection('notices')
+          .doc(widget.noticeId)
           .get();
 
       if (!doc.exists) {
@@ -60,32 +66,6 @@ class _NoticeEditPageState extends State<NoticeEditPage> {
     }
   }
 
-  Future<void> _pickDateTime(BuildContext context) async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _publishAt ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
-    );
-    if (date == null) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_publishAt ?? DateTime.now()),
-    );
-    if (time == null) return;
-
-    setState(() {
-      _publishAt = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
-    });
-  }
-
   Future<void> _updateNotice() async {
     final title = _titleController.text.trim();
     final content = _contentController.text.trim();
@@ -99,8 +79,10 @@ class _NoticeEditPageState extends State<NoticeEditPage> {
 
     try {
       await FirebaseFirestore.instance
-          .collection('posts')
-          .doc(widget.postId)
+          .collection('teams')
+          .doc(widget.teamId)
+          .collection('notices')
+          .doc(widget.noticeId)
           .update({
             'title': title,
             'content': content,
@@ -201,5 +183,31 @@ class _NoticeEditPageState extends State<NoticeEditPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickDateTime(BuildContext context) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _publishAt ?? DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+    );
+    if (date == null) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_publishAt ?? DateTime.now()),
+    );
+    if (time == null) return;
+
+    setState(() {
+      _publishAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+    });
   }
 }

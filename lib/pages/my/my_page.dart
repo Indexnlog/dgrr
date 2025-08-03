@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+
+// ✅ Provider
+import '../../providers/team_provider.dart';
 
 // ✅ 프로필 수정 페이지
 import '../profile/profile_edit_page.dart';
@@ -9,7 +13,7 @@ import '../profile/profile_edit_page.dart';
 import '../finance/transaction_management_page.dart';
 import '../reservations/reservation_management_page.dart';
 import '../notices/notice_management_page.dart';
-import '../votes/vote_management_page.dart';
+import '../polls/poll_management_page.dart';
 import '../finance/fee_management_page.dart';
 
 class MyPage extends StatelessWidget {
@@ -18,6 +22,7 @@ class MyPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
+    final teamId = Provider.of<TeamProvider>(context).teamId;
 
     if (currentUser == null) {
       return const Scaffold(body: Center(child: Text('로그인이 필요합니다.')));
@@ -27,6 +32,8 @@ class MyPage extends StatelessWidget {
       appBar: AppBar(title: const Text('🙋 My')),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
+            .collection('teams')
+            .doc(teamId)
             .collection('members')
             .doc(currentUser.uid)
             .snapshots(),
@@ -44,7 +51,6 @@ class MyPage extends StatelessWidget {
           final joinDate = (data['joinDate'] as Timestamp?)?.toDate();
           final photoUrl = data['photoUrl'];
 
-          // 입단일 경과일 계산
           int daysTogether = 0;
           String joinDateStr = '';
           if (joinDate != null) {
@@ -105,7 +111,7 @@ class MyPage extends StatelessWidget {
                   ),
                 ),
 
-                // ✅ 수정하기 / 로그아웃 버튼
+                // ✅ 수정/로그아웃 버튼
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Row(
@@ -145,7 +151,7 @@ class MyPage extends StatelessWidget {
                 const SizedBox(height: 24),
                 const Divider(),
 
-                // ✅ 메뉴 리스트
+                // ✅ 누구나 접근 가능한 메뉴
                 ListTile(
                   leading: const Icon(Icons.monetization_on),
                   title: const Text('💰 회비 관리'),

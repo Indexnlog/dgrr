@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+
+import '../../providers/user_role_provider.dart'; // ✅ 추가
 
 class ClassAddPage extends StatefulWidget {
   const ClassAddPage({super.key});
@@ -18,7 +21,14 @@ class _ClassAddPageState extends State<ClassAddPage> {
   DateTime? _registerStart;
   DateTime? _registerEnd;
 
-  /// 📌 수업 날짜 선택
+  @override
+  void dispose() {
+    _locationController.dispose();
+    _startTimeController.dispose();
+    _endTimeController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickClassDate(BuildContext context) async {
     final picked = await showDatePicker(
       context: context,
@@ -33,7 +43,6 @@ class _ClassAddPageState extends State<ClassAddPage> {
     }
   }
 
-  /// 📌 등록기간 날짜 선택
   Future<void> _pickDate(BuildContext context, bool isRegisterStart) async {
     final picked = await showDatePicker(
       context: context,
@@ -52,7 +61,6 @@ class _ClassAddPageState extends State<ClassAddPage> {
     }
   }
 
-  /// 📌 Firestore에 수업 저장
   Future<void> _saveClass() async {
     if (_locationController.text.isEmpty ||
         _startTimeController.text.isEmpty ||
@@ -93,7 +101,6 @@ class _ClassAddPageState extends State<ClassAddPage> {
       return;
     }
 
-    // ✅ 저장
     await FirebaseFirestore.instance
         .collection('teams')
         .doc(teamId)
@@ -122,15 +129,16 @@ class _ClassAddPageState extends State<ClassAddPage> {
   }
 
   @override
-  void dispose() {
-    _locationController.dispose();
-    _startTimeController.dispose();
-    _endTimeController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final role = context.watch<UserRoleProvider>().role;
+    final isLessonManager = role == '수업팀';
+
+    if (!isLessonManager) {
+      return const Scaffold(
+        body: Center(child: Text('⚠️ 수업팀만 수업을 등록할 수 있습니다')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('➕ 수업 등록')),
       body: SingleChildScrollView(
@@ -163,7 +171,6 @@ class _ClassAddPageState extends State<ClassAddPage> {
             ),
             const SizedBox(height: 16),
 
-            // 📅 수업 날짜
             Row(
               children: [
                 Expanded(
@@ -179,8 +186,6 @@ class _ClassAddPageState extends State<ClassAddPage> {
                 ),
               ],
             ),
-
-            // 📅 등록 시작
             Row(
               children: [
                 Expanded(
@@ -196,8 +201,6 @@ class _ClassAddPageState extends State<ClassAddPage> {
                 ),
               ],
             ),
-
-            // 📅 등록 종료
             Row(
               children: [
                 Expanded(
@@ -213,7 +216,6 @@ class _ClassAddPageState extends State<ClassAddPage> {
                 ),
               ],
             ),
-
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,

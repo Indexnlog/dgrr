@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'notice_edit_page.dart';
 
 class NoticeManagementPage extends StatelessWidget {
-  const NoticeManagementPage({super.key});
+  final String teamId;
+  const NoticeManagementPage({super.key, required this.teamId});
 
   @override
   Widget build(BuildContext context) {
@@ -13,9 +15,10 @@ class NoticeManagementPage extends StatelessWidget {
       appBar: AppBar(title: const Text('📋 공지 관리')),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('posts')
-            .where('category', isEqualTo: '공지')
-            .where('authorId', isEqualTo: currentUid) // 내가 작성한 공지만 보기
+            .collection('teams')
+            .doc(teamId)
+            .collection('notices')
+            .where('authorId', isEqualTo: currentUid)
             .orderBy('createdAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -65,9 +68,14 @@ class NoticeManagementPage extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.blue),
                         onPressed: () {
-                          // TODO: 수정 페이지로 이동
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('✏️ 수정 기능은 추후 구현 예정')),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => NoticeEditPage(
+                                teamId: teamId,
+                                noticeId: doc.id,
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -97,9 +105,12 @@ class NoticeManagementPage extends StatelessWidget {
 
                           if (confirm == true) {
                             await FirebaseFirestore.instance
-                                .collection('posts')
+                                .collection('teams')
+                                .doc(teamId)
+                                .collection('notices')
                                 .doc(doc.id)
                                 .delete();
+
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('🗑️ 공지를 삭제했습니다.')),
                             );

@@ -10,7 +10,7 @@ import 'package:provider/provider.dart';
 
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/primary_button.dart';
-import '../../providers/team_provider.dart'; // ✅ teamId 가져오기
+import '../../providers/team_provider.dart';
 
 class ProfileSetupPage extends StatefulWidget {
   const ProfileSetupPage({super.key});
@@ -30,19 +30,22 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
   final _workAddressController = TextEditingController();
 
   String _department = '미정';
-  bool _saving = false;
-
-  File? _selectedImage;
-  final ImagePicker _picker = ImagePicker();
-
   DateTime? _selectedJoinDate;
+  File? _selectedImage;
+
+  bool _saving = false;
+  final _picker = ImagePicker();
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
 
   Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _selectedImage = File(pickedFile.path);
-      });
+    final picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() => _selectedImage = File(picked.path));
     }
   }
 
@@ -66,6 +69,11 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     return await ref.getDownloadURL();
   }
 
+  Future<bool> _isDuplicateField(Query query, String myUid) async {
+    final result = await query.get();
+    return result.docs.any((doc) => doc.id != myUid);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedJoinDate == null) {
@@ -77,13 +85,14 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        _showSnack('로그인 상태가 아닙니다.');
+      final teamId = context.read<TeamProvider>().teamId;
+
+      if (user == null || teamId == null) {
+        _showSnack('로그인 또는 팀 선택이 필요합니다.');
         setState(() => _saving = false);
         return;
       }
 
-      final teamId = context.read<TeamProvider>().teamId;
       final membersRef = FirebaseFirestore.instance
           .collection('teams')
           .doc(teamId)
@@ -92,19 +101,22 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
       final number = int.tryParse(_numberController.text.trim()) ?? 0;
       final uniformName = _uniformNameController.text.trim();
 
-      final numberQuery = await membersRef
-          .where('number', isEqualTo: number)
-          .get();
-      if (numberQuery.docs.any((doc) => doc.id != user.uid)) {
+      // 중복 체크
+      final isNumberDup = await _isDuplicateField(
+        membersRef.where('number', isEqualTo: number),
+        user.uid,
+      );
+      if (isNumberDup) {
         _showSnack('등번호 $number 는 이미 사용 중입니다.');
         setState(() => _saving = false);
         return;
       }
 
-      final uniformNameQuery = await membersRef
-          .where('uniformName', isEqualTo: uniformName)
-          .get();
-      if (uniformNameQuery.docs.any((doc) => doc.id != user.uid)) {
+      final isUniformDup = await _isDuplicateField(
+        membersRef.where('uniformName', isEqualTo: uniformName),
+        user.uid,
+      );
+      if (isUniformDup) {
         _showSnack('유니폼 이름 "$uniformName" 은 이미 사용 중입니다.');
         setState(() => _saving = false);
         return;
@@ -114,6 +126,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
 
       await membersRef.doc(user.uid).set({
         'memberId': user.uid,
+        'teamId': teamId,
         'name': _nameController.text.trim(),
         'uniformName': uniformName,
         'number': number,
@@ -124,7 +137,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
         'role': '일반회원',
         'status': 'pending',
         'joinDate': Timestamp.fromDate(_selectedJoinDate!),
-        'teamId': teamId,
         if (photoUrl != null) 'photoUrl': photoUrl,
       });
 
@@ -135,12 +147,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
     } finally {
       setState(() => _saving = false);
     }
-  }
-
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -177,15 +183,14 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               CustomTextField(
                 controller: _nameController,
                 hintText: '본명',
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? '본명을 입력해주세요' : null,
+                validator: (v) => v == null || v.isEmpty ? '본명을 입력해주세요' : null,
               ),
               const SizedBox(height: 16),
               CustomTextField(
                 controller: _uniformNameController,
                 hintText: '유니폼 이름',
                 validator: (v) =>
-                    (v == null || v.isEmpty) ? '유니폼 이름을 입력해주세요' : null,
+                    v == null || v.isEmpty ? '유니폼 이름을 입력해주세요' : null,
               ),
               const SizedBox(height: 16),
               CustomTextField(
@@ -213,6 +218,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _department,
+                decoration: const InputDecoration(labelText: '소속'),
                 items: const [
                   DropdownMenuItem(value: '운영팀', child: Text('운영팀')),
                   DropdownMenuItem(value: '수업관리팀', child: Text('수업관리팀')),
@@ -223,7 +229,6 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                   DropdownMenuItem(value: '미정', child: Text('미정')),
                 ],
                 onChanged: (v) => setState(() => _department = v ?? '미정'),
-                decoration: const InputDecoration(labelText: '소속'),
               ),
               const SizedBox(height: 16),
               ListTile(

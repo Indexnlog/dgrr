@@ -17,17 +17,16 @@ class EventCard extends StatelessWidget {
 
   /// ✅ 지도 열기 함수
   Future<void> _openMap(BuildContext context, String? location) async {
-    final safeLocation = location?.trim() ?? '';
-    if (safeLocation.isEmpty) {
+    final safeLocation = location?.trim();
+    if (safeLocation == null || safeLocation.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('장소 정보가 없습니다.')));
       return;
     }
 
-    // 네이버 지도 웹 검색 URL
     final encodedLocation = Uri.encodeComponent(safeLocation);
-    final url = Uri.parse('https://map.naver.com/p/$encodedLocation');
+    final url = Uri.parse('https://map.naver.com/v5/search/$encodedLocation');
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -40,21 +39,22 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final safeLocation = event.location ?? '';
+    final location = event.location?.trim() ?? '';
+    final timeText = event.time?.trim() ?? '';
 
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: ListTile(
         leading: Icon(
-          event.type == 'lesson' ? Icons.class_ : Icons.sports_soccer,
-          color: event.type == 'lesson' ? Colors.blue : Colors.green,
+          event.type == 'class' ? Icons.class_ : Icons.sports_soccer,
+          color: event.type == 'class' ? Colors.blue : Colors.green,
         ),
         title: Text(
-          '${event.time ?? ''} @ $safeLocation',
+          '$timeText @ $location',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text('참석자: ${event.attendees.length}'),
+        subtitle: Text('참석자: ${event.attendees.length}명'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -70,18 +70,32 @@ class EventCard extends StatelessWidget {
             ),
             IconButton(
               icon: const Icon(Icons.map, color: Colors.blueGrey),
-              onPressed: () => _openMap(context, safeLocation), // ✅ null 방지
+              onPressed: () => _openMap(context, location),
               tooltip: '지도 열기',
             ),
           ],
         ),
         onTap: () {
-          // 👉 상세 페이지로 이동
+          String collectionName;
+          switch (event.type) {
+            case 'class':
+              collectionName = 'classes';
+              break;
+            case 'match':
+              collectionName = 'matches';
+              break;
+            case 'event':
+              collectionName = 'events';
+              break;
+            default:
+              collectionName = 'unknown';
+          }
+
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ScheduleDetailPage(
-                collectionName: event.type == 'lesson' ? 'classes' : 'matches',
+              builder: (_) => ScheduleDetailPage(
+                collectionName: collectionName,
                 docId: event.id,
               ),
             ),

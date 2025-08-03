@@ -3,9 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
-
 class TransactionManagementPage extends StatefulWidget {
-  const TransactionManagementPage({super.key});
+  final String teamId;
+  const TransactionManagementPage({super.key, required this.teamId});
 
   @override
   State<TransactionManagementPage> createState() =>
@@ -13,8 +13,6 @@ class TransactionManagementPage extends StatefulWidget {
 }
 
 class _TransactionManagementPageState extends State<TransactionManagementPage> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _memoController = TextEditingController();
 
@@ -29,20 +27,39 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
   double totalBalance = 0;
   double monthBalance = 0;
 
-  bool get isAdmin {
-    const adminUids = ['YOUR_ADMIN_UID']; // 관리자 UID 넣기
-    return adminUids.contains(FirebaseAuth.instance.currentUser?.uid);
-  }
+  bool isManager = false;
+
+  CollectionReference get _collection => FirebaseFirestore.instance.collection(
+    'teams/${widget.teamId}/transactions',
+  );
 
   @override
   void initState() {
     super.initState();
+    _checkManagerRole();
     _loadAvailableMonths();
     _calculateBalance();
   }
 
+  Future<void> _checkManagerRole() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final memberDoc = await FirebaseFirestore.instance
+        .collection('teams')
+        .doc(widget.teamId)
+        .collection('members')
+        .doc(uid)
+        .get();
+
+    final role = memberDoc.data()?['role'];
+    if (role == 'manager' || role == 'treasurer') {
+      setState(() => isManager = true);
+    }
+  }
+
   Future<void> _loadAvailableMonths() async {
-    final snapshot = await _firestore.collection('transactions').get();
+    final snapshot = await _collection.get();
     final months = <String>{};
     for (var doc in snapshot.docs) {
       final ts = (doc['date'] as Timestamp).toDate();
@@ -57,14 +74,11 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
   }
 
   Future<void> _calculateBalance() async {
-    final snapshot = await _firestore.collection('transactions').get();
-    double income = 0;
-    double expense = 0;
-    double incomeMonth = 0;
-    double expenseMonth = 0;
+    final snapshot = await _collection.get();
+    double income = 0, expense = 0, incomeMonth = 0, expenseMonth = 0;
 
     for (var doc in snapshot.docs) {
-      final data = doc.data();
+      final data = doc.data() as Map<String, dynamic>;
       final ts = (data['date'] as Timestamp).toDate();
       final ym = "${ts.year}-${ts.month.toString().padLeft(2, '0')}";
       final amt = (data['amount'] as num).toDouble();
@@ -87,7 +101,9 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
   Future<void> _addTransaction() async {
     final amount = int.tryParse(_amountController.text);
     if (amount == null) return;
-    await _firestore.collection('transactions').add({
+
+    await _collection.add({
+      'teamId': widget.teamId,
       'date': Timestamp.fromDate(selectedDate),
       'type': selectedType,
       'category': selectedCategory,
@@ -95,6 +111,7 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
       'memo': _memoController.text,
       'createdBy': FirebaseAuth.instance.currentUser!.uid,
     });
+
     _amountController.clear();
     _memoController.clear();
     _calculateBalance();
@@ -102,7 +119,7 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
   }
 
   Future<void> _deleteTransaction(String docId) async {
-    await _firestore.collection('transactions').doc(docId).delete();
+    await _collection.doc(docId).delete();
     _calculateBalance();
     _loadAvailableMonths();
   }
@@ -121,21 +138,18 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // === 상단 잔액 표시 ===
             Row(
               children: [
                 const Text('📅 월 선택:'),
                 const SizedBox(width: 12),
                 DropdownButton<String>(
                   value: selectedYearMonth,
-                  items: availableYearMonths.map((m) {
-                    return DropdownMenuItem(value: m, child: Text(m));
-                  }).toList(),
+                  items: availableYearMonths
+                      .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                      .toList(),
                   onChanged: (val) {
                     if (val == null) return;
-                    setState(() {
-                      selectedYearMonth = val;
-                    });
+                    setState(() => selectedYearMonth = val);
                     _calculateBalance();
                   },
                 ),
@@ -146,19 +160,13 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
               '💰 현재 잔액: ${formatter.format(totalBalance)}',
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 4),
             Text(
               '📅 $selectedYearMonth 기준 잔액: ${formatter.format(monthBalance)}',
               style: const TextStyle(color: Colors.grey),
             ),
             const Divider(height: 32),
-
-            // === 중앙 리스트 ===
             StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('transactions')
-                  .orderBy('date', descending: true)
-                  .snapshots(),
+              stream: _collection.orderBy('date', descending: true).snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const CircularProgressIndicator();
                 final docs = snapshot.data!.docs.where((doc) {
@@ -167,6 +175,7 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
                       "${ts.year}-${ts.month.toString().padLeft(2, '0')}";
                   return ym == selectedYearMonth;
                 }).toList();
+
                 return Column(
                   children: docs.map((doc) {
                     final data = doc.data() as Map<String, dynamic>;
@@ -175,6 +184,7 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
                     final color = data['type'] == 'income'
                         ? Colors.green
                         : Colors.red;
+
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 4),
                       child: ListTile(
@@ -198,7 +208,7 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
                                 color: color,
                               ),
                             ),
-                            if (isAdmin)
+                            if (isManager)
                               IconButton(
                                 icon: const Icon(
                                   Icons.delete,
@@ -215,11 +225,8 @@ class _TransactionManagementPageState extends State<TransactionManagementPage> {
               },
             ),
             const Divider(height: 32),
-
-            // === 하단 입력창 ===
-            if (isAdmin) ...[
+            if (isManager) ...[
               Text('➕ 새 내역 추가', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 8),
               Row(
                 children: [
                   DropdownButton<String>(

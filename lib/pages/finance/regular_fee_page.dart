@@ -6,21 +6,20 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-class ClassFeePage extends StatefulWidget {
-  const ClassFeePage({super.key});
+class RegularFeePage extends StatefulWidget {
+  const RegularFeePage({super.key});
 
   @override
-  State<ClassFeePage> createState() => _ClassFeePageState();
+  State<RegularFeePage> createState() => _RegularFeePageState();
 }
 
-class _ClassFeePageState extends State<ClassFeePage> {
+class _RegularFeePageState extends State<RegularFeePage> {
   final _firestore = FirebaseFirestore.instance;
   final _amountController = TextEditingController();
   final _memoController = TextEditingController();
 
   String? _teamId;
   bool isManager = false;
-  bool isTreasurer = false;
 
   DateTime selectedDate = DateTime.now();
   String selectedYearMonth = _currentYearMonth();
@@ -48,15 +47,12 @@ class _ClassFeePageState extends State<ClassFeePage> {
           .collection('members')
           .doc(uid)
           .get();
-
       if (memberDoc.exists) {
-        final role = memberDoc.data()?['role'] ?? '';
+        final role = memberDoc['role'] ?? '';
         setState(() {
           _teamId = doc.id;
-          isManager = (role == 'manager');
-          isTreasurer = (role == 'treasurer');
+          isManager = (role == 'treasurer');
         });
-
         _loadAvailableMonths(doc.id);
         return;
       }
@@ -67,7 +63,7 @@ class _ClassFeePageState extends State<ClassFeePage> {
     final snapshot = await _firestore
         .collection('teams')
         .doc(teamId)
-        .collection('class_fees')
+        .collection('regular_fees')
         .get();
 
     final months = <String>{};
@@ -83,7 +79,7 @@ class _ClassFeePageState extends State<ClassFeePage> {
     });
   }
 
-  Future<void> _addClassFee() async {
+  Future<void> _addRegularFee() async {
     if (_teamId == null) return;
 
     final amount = int.tryParse(_amountController.text);
@@ -97,7 +93,7 @@ class _ClassFeePageState extends State<ClassFeePage> {
     await _firestore
         .collection('teams')
         .doc(_teamId)
-        .collection('class_fees')
+        .collection('regular_fees')
         .add({
           'teamId': _teamId,
           'date': Timestamp.fromDate(selectedDate),
@@ -111,12 +107,12 @@ class _ClassFeePageState extends State<ClassFeePage> {
     _loadAvailableMonths(_teamId!);
   }
 
-  Future<void> _deleteClassFee(String docId) async {
+  Future<void> _deleteRegularFee(String docId) async {
     if (_teamId == null) return;
     await _firestore
         .collection('teams')
         .doc(_teamId)
-        .collection('class_fees')
+        .collection('regular_fees')
         .doc(docId)
         .delete();
 
@@ -136,11 +132,11 @@ class _ClassFeePageState extends State<ClassFeePage> {
     }
 
     final directory = await getTemporaryDirectory();
-    final path = '${directory.path}/class_fees_$selectedYearMonth.csv';
+    final path = '${directory.path}/regular_fees_$selectedYearMonth.csv';
     final file = File(path);
     await file.writeAsString(buffer.toString());
 
-    await Share.shareXFiles([XFile(path)], text: '수업 회비 내역');
+    await Share.shareXFiles([XFile(path)], text: '정기 회비 내역');
   }
 
   @override
@@ -155,18 +151,17 @@ class _ClassFeePageState extends State<ClassFeePage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('🏫 수업 회비 관리')),
+      appBar: AppBar(title: const Text('💸 정기 회비 관리')),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore
             .collection('teams')
             .doc(_teamId)
-            .collection('class_fees')
+            .collection('regular_fees')
             .orderBy('date', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (!snapshot.hasData)
             return const Center(child: CircularProgressIndicator());
-          }
 
           final docs = snapshot.data!.docs.where((doc) {
             final ts = (doc['date'] as Timestamp).toDate();
@@ -206,15 +201,17 @@ class _ClassFeePageState extends State<ClassFeePage> {
                   ],
                 ),
                 const SizedBox(height: 12),
+
                 Text(
                   '총합: ${currencyFormatter.format(monthlyTotal)}',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                    color: Colors.green,
                   ),
                 ),
                 const Divider(height: 32),
+
                 if (docs.isEmpty)
                   const Text('해당 월에는 회비 기록이 없습니다.')
                 else
@@ -226,7 +223,7 @@ class _ClassFeePageState extends State<ClassFeePage> {
                         margin: const EdgeInsets.symmetric(vertical: 4),
                         child: ListTile(
                           title: Text(
-                            "${DateFormat('yyyy-MM-dd').format(ts)} 수업 회비",
+                            "${DateFormat('yyyy-MM-dd').format(ts)} 정기 회비",
                           ),
                           subtitle: Text(data['memo'] ?? ''),
                           trailing: Row(
@@ -238,13 +235,13 @@ class _ClassFeePageState extends State<ClassFeePage> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              if (isManager || isTreasurer)
+                              if (isManager)
                                 IconButton(
                                   icon: const Icon(
                                     Icons.delete,
                                     color: Colors.red,
                                   ),
-                                  onPressed: () => _deleteClassFee(doc.id),
+                                  onPressed: () => _deleteRegularFee(doc.id),
                                 ),
                             ],
                           ),
@@ -252,19 +249,22 @@ class _ClassFeePageState extends State<ClassFeePage> {
                       );
                     }).toList(),
                   ),
+
                 const SizedBox(height: 16),
                 if (docs.isNotEmpty)
                   Center(
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.download),
-                      label: const Text('이 월 회비 내역 CSV로 저장'),
+                      label: const Text('CSV로 저장'),
                       onPressed: () => _exportToCSV(docs),
                     ),
                   ),
+
                 const Divider(height: 32),
-                if (isManager || isTreasurer) ...[
+
+                if (isManager) ...[
                   Text(
-                    '➕ 수업 회비 추가',
+                    '➕ 정기 회비 추가',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
@@ -279,7 +279,7 @@ class _ClassFeePageState extends State<ClassFeePage> {
                   ),
                   const SizedBox(height: 8),
                   ElevatedButton.icon(
-                    onPressed: _addClassFee,
+                    onPressed: _addRegularFee,
                     icon: const Icon(Icons.save),
                     label: const Text('저장'),
                   ),

@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class NoticeDetailPage extends StatelessWidget {
-  final String postId;
-  const NoticeDetailPage({super.key, required this.postId});
+  final String teamId;
+  final String noticeId;
+  const NoticeDetailPage({
+    super.key,
+    required this.teamId,
+    required this.noticeId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -11,8 +16,10 @@ class NoticeDetailPage extends StatelessWidget {
       appBar: AppBar(title: const Text('📢 공지 상세')),
       body: FutureBuilder<DocumentSnapshot>(
         future: FirebaseFirestore.instance
-            .collection('posts')
-            .doc(postId)
+            .collection('teams')
+            .doc(teamId)
+            .collection('notices')
+            .doc(noticeId)
             .get(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {

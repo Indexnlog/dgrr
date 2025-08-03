@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class HomeTab extends StatelessWidget {
   const HomeTab({super.key});
 
-  /// ✅ 현재 로그인된 사용자의 teamId를 찾아 해당 team의 members 컬렉션에서 사용자 정보 반환
+  /// ✅ 현재 로그인된 사용자의 teamId를 찾아 해당 팀의 members 컬렉션에서 사용자 정보 반환
   Future<Map<String, dynamic>?> _fetchUserData() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return null;
 
-    // 모든 팀 조회
-    final teamQuery = await FirebaseFirestore.instance
-        .collection('teams')
-        .get();
+    final firestore = FirebaseFirestore.instance;
+    final teamQuery = await firestore.collection('teams').get();
 
     for (var teamDoc in teamQuery.docs) {
       final teamId = teamDoc.id;
-
-      final memberDoc = await FirebaseFirestore.instance
+      final memberDoc = await firestore
           .collection('teams')
           .doc(teamId)
           .collection('members')
@@ -27,12 +25,11 @@ class HomeTab extends StatelessWidget {
 
       if (memberDoc.exists) {
         final data = memberDoc.data();
-        data?['teamId'] = teamId; // teamId도 포함해서 리턴
+        data?['teamId'] = teamId; // 🔁 teamId 포함
         return data;
       }
     }
-
-    return null; // 사용자를 포함한 팀이 없음
+    return null; // 소속된 팀 없음
   }
 
   @override
@@ -133,7 +130,7 @@ class HomeTab extends StatelessWidget {
                 ),
                 trailing: createdAt != null
                     ? Text(
-                        '${createdAt.month}/${createdAt.day}',
+                        DateFormat('MM.dd').format(createdAt),
                         style: const TextStyle(fontSize: 12),
                       )
                     : null,

@@ -24,6 +24,12 @@ dependencies:
   image_picker: ^1.1.2
   path: ^1.9.0
 
+  # 📁 경로 저장 관련
+  path_provider: ^2.1.2
+
+  # 🔗 공유 기능
+  share_plus: ^7.2.1
+
   # 🎨 UI/기타
   cupertino_icons: ^1.0.8
   table_calendar: ^3.0.8

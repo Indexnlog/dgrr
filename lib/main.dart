@@ -5,9 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
 import 'providers/team_provider.dart';
+import 'providers/user_role_provider.dart';
+
+import 'pages/main_page.dart';
 import 'pages/auth/login_page.dart';
 import 'pages/auth/select_team_page.dart';
-import 'pages/main_page.dart';
+import 'pages/auth/init_page.dart'; // ✅ 추가
+import 'pages/auth/splash_page.dart'; // ✅ 추가
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,27 +32,22 @@ void main() async {
             return teamProvider;
           },
         ),
+        ChangeNotifierProvider(create: (_) => UserRoleProvider()),
       ],
-      child: MyApp(initialRoute: savedTeamId == null ? 'select' : 'login'),
+      child: const MyApp(),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  final String initialRoute;
-  const MyApp({super.key, required this.initialRoute});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '지구공',
       debugShowCheckedModeBanner: false,
-      initialRoute: initialRoute,
-      routes: {
-        'select': (_) => const SelectTeamPage(),
-        'login': (_) => const LoginPage(),
-        'main': (_) => const MainPage(),
-      },
+      home: const SplashPage(), // ✅ 최초 진입점 변경!
     );
   }
 }

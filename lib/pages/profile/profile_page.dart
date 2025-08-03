@@ -10,11 +10,13 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final teamId = Provider.of<TeamProvider>(context, listen: false).teamId;
+    final teamId = context.read<TeamProvider>().teamId;
     final user = FirebaseAuth.instance.currentUser;
 
-    if (user == null || teamId == null) {
-      return const Scaffold(body: Center(child: Text('로그인이 필요합니다')));
+    if (teamId == null || user == null) {
+      return const Scaffold(
+        body: Center(child: Text('⚠️ 로그인 또는 팀 선택이 필요합니다.')),
+      );
     }
 
     final memberRef = FirebaseFirestore.instance
@@ -24,7 +26,7 @@ class ProfilePage extends StatelessWidget {
         .doc(user.uid);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('개인 정보')),
+      appBar: AppBar(title: const Text('👤 내 정보')),
       body: FutureBuilder<DocumentSnapshot>(
         future: memberRef.get(),
         builder: (context, snapshot) {
@@ -33,20 +35,54 @@ class ProfilePage extends StatelessWidget {
           }
 
           if (!snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: Text('회원 정보를 찾을 수 없습니다.'));
+            return const Center(child: Text('❌ 회원 정보를 찾을 수 없습니다.'));
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
 
+          String getField(String key) =>
+              data[key]?.toString().trim().isNotEmpty == true
+              ? data[key].toString()
+              : '-';
+
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text('이름: ${data['name'] ?? '없음'}'),
-              Text('유니폼 이름: ${data['uniformName'] ?? '없음'}'),
-              Text('등번호: ${data['number'] ?? '없음'}'),
-              Text('소속: ${data['department'] ?? '없음'}'),
-              Text('상태: ${data['status'] ?? '없음'}'),
-              // 필요한 항목 더 추가 가능
+              const Text(
+                '📄 기본 정보',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+
+              ListTile(
+                title: const Text('이름'),
+                subtitle: Text(getField('name')),
+              ),
+              ListTile(
+                title: const Text('유니폼 이름'),
+                subtitle: Text(getField('uniformName')),
+              ),
+              ListTile(
+                title: const Text('등번호'),
+                subtitle: Text(getField('number')),
+              ),
+              ListTile(
+                title: const Text('소속'),
+                subtitle: Text(getField('department')),
+              ),
+              ListTile(
+                title: const Text('상태'),
+                subtitle: Text(getField('status')),
+              ),
+              const SizedBox(height: 24),
+
+              // 추후 편집 기능 추가 시
+              // ElevatedButton(
+              //   onPressed: () {
+              //     Navigator.push(...); // 수정 페이지로 이동
+              //   },
+              //   child: const Text('내 정보 수정'),
+              // ),
             ],
           );
         },

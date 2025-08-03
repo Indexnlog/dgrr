@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+
+import '../../providers/user_role_provider.dart'; // ✅ UserRoleProvider 임포트
 
 class MatchAddPage extends StatefulWidget {
-  const MatchAddPage({super.key});
+  final String teamId;
+
+  const MatchAddPage({super.key, required this.teamId});
 
   @override
   State<MatchAddPage> createState() => _MatchAddPageState();
@@ -18,12 +24,19 @@ class _MatchAddPageState extends State<MatchAddPage> {
   DateTime? _registerStart;
   DateTime? _registerEnd;
 
-  /// 📌 날짜 선택 다이얼로그 (등록 시작/종료)
+  @override
+  void dispose() {
+    _teamNameController.dispose();
+    _locationController.dispose();
+    _startTimeController.dispose();
+    _endTimeController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickDate(BuildContext context, bool isRegisterStart) async {
-    final initial = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial,
+      initialDate: DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
     );
@@ -38,12 +51,10 @@ class _MatchAddPageState extends State<MatchAddPage> {
     }
   }
 
-  /// 📌 매치 날짜 선택
   Future<void> _pickMatchDate(BuildContext context) async {
-    final initial = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial,
+      initialDate: DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
     );
@@ -54,7 +65,6 @@ class _MatchAddPageState extends State<MatchAddPage> {
     }
   }
 
-  /// 📌 Firestore 저장
   Future<void> _saveMatch() async {
     if (_teamNameController.text.isEmpty ||
         _locationController.text.isEmpty ||
@@ -69,17 +79,22 @@ class _MatchAddPageState extends State<MatchAddPage> {
       return;
     }
 
-    await FirebaseFirestore.instance.collection('matches').add({
-      'teamName': _teamNameController.text.trim(),
-      'location': _locationController.text.trim(),
-      'startTime': _startTimeController.text.trim(),
-      'endTime': _endTimeController.text.trim(),
-      'date': Timestamp.fromDate(_selectedDate!), // ✅ 매치 날짜
-      'registerStart': Timestamp.fromDate(_registerStart!), // ✅ 등록 시작
-      'registerEnd': Timestamp.fromDate(_registerEnd!), // ✅ 등록 종료
-      'recruitStatus': 'confirmed', // 기본 상태
-      'createdAt': FieldValue.serverTimestamp(), // 생성 시각
-    });
+    await FirebaseFirestore.instance
+        .collection('teams')
+        .doc(widget.teamId)
+        .collection('matches')
+        .add({
+          'teamName': _teamNameController.text.trim(),
+          'location': _locationController.text.trim(),
+          'startTime': _startTimeController.text.trim(),
+          'endTime': _endTimeController.text.trim(),
+          'date': Timestamp.fromDate(_selectedDate!),
+          'registerStart': Timestamp.fromDate(_registerStart!),
+          'registerEnd': Timestamp.fromDate(_registerEnd!),
+          'recruitStatus': 'confirmed',
+          'createdAt': FieldValue.serverTimestamp(),
+          'teamId': widget.teamId,
+        });
 
     if (mounted) {
       Navigator.pop(context);
@@ -90,22 +105,21 @@ class _MatchAddPageState extends State<MatchAddPage> {
   }
 
   @override
-  void dispose() {
-    _teamNameController.dispose();
-    _locationController.dispose();
-    _startTimeController.dispose();
-    _endTimeController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final role = context.watch<UserRoleProvider>().role;
+    final isMatchManager = role == '경기팀';
+
+    if (!isMatchManager) {
+      return const Scaffold(
+        body: Center(child: Text('⚠️ 경기팀만 매치를 등록할 수 있습니다')),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('➕ 매치 등록')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
               controller: _teamNameController,
@@ -139,8 +153,6 @@ class _MatchAddPageState extends State<MatchAddPage> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // 📅 매치 날짜
             Row(
               children: [
                 Expanded(
@@ -156,8 +168,6 @@ class _MatchAddPageState extends State<MatchAddPage> {
                 ),
               ],
             ),
-
-            // 📅 등록 시작
             Row(
               children: [
                 Expanded(
@@ -173,8 +183,6 @@ class _MatchAddPageState extends State<MatchAddPage> {
                 ),
               ],
             ),
-
-            // 📅 등록 종료
             Row(
               children: [
                 Expanded(
@@ -190,7 +198,6 @@ class _MatchAddPageState extends State<MatchAddPage> {
                 ),
               ],
             ),
-
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,

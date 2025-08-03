@@ -3,8 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class RoleManagePage extends StatefulWidget {
-  final String memberUid; // 역할을 변경할 멤버의 Firestore 문서 ID
-  const RoleManagePage({super.key, required this.memberUid});
+  final String teamId;
+  final String memberUid;
+
+  const RoleManagePage({
+    super.key,
+    required this.teamId,
+    required this.memberUid,
+  });
 
   @override
   State<RoleManagePage> createState() => _RoleManagePageState();
@@ -22,9 +28,12 @@ class _RoleManagePageState extends State<RoleManagePage> {
 
   Future<void> _loadCurrentRole() async {
     final doc = await FirebaseFirestore.instance
+        .collection('teams')
+        .doc(widget.teamId)
         .collection('members')
         .doc(widget.memberUid)
         .get();
+
     final data = doc.data();
     if (data != null) {
       setState(() {
@@ -36,17 +45,17 @@ class _RoleManagePageState extends State<RoleManagePage> {
 
   Future<void> _saveRole() async {
     final docRef = FirebaseFirestore.instance
+        .collection('teams')
+        .doc(widget.teamId)
         .collection('members')
         .doc(widget.memberUid);
 
-    // 기존 role 가져오기
     final doc = await docRef.get();
     final oldRole = doc.data()?['role'] ?? '일반회원';
 
-    // role 업데이트
     await docRef.update({'role': _selectedRole});
 
-    // 로그 기록
+    // 변경 기록 로그 저장
     await docRef.collection('logs').add({
       'field': 'role',
       'previousValue': oldRole,
@@ -88,7 +97,9 @@ class _RoleManagePageState extends State<RoleManagePage> {
               value: _selectedRole,
               items: const [
                 DropdownMenuItem(value: '일반회원', child: Text('일반회원')),
-                DropdownMenuItem(value: '운영팀', child: Text('운영팀')),
+                DropdownMenuItem(value: '경기팀', child: Text('경기팀')),
+                DropdownMenuItem(value: '수업팀', child: Text('수업팀')),
+                DropdownMenuItem(value: '대외팀', child: Text('대외팀')),
               ],
               onChanged: (v) {
                 setState(() {
@@ -97,7 +108,7 @@ class _RoleManagePageState extends State<RoleManagePage> {
               },
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                labelText: '새로운 역할 선택',
+                labelText: '역할 선택',
               ),
             ),
 

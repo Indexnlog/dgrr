@@ -3,17 +3,29 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'notice_detail_page.dart';
 
 class NoticeListPage extends StatelessWidget {
-  const NoticeListPage({super.key});
+  final String teamId;
+  const NoticeListPage({super.key, required this.teamId});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('📋 전체 공지')),
+      appBar: AppBar(
+        title: const Text('📋 전체 공지'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () {
+              Navigator.pushNamed(context, '/notice_create', arguments: teamId);
+            },
+          ),
+        ],
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('posts')
-            .where('category', isEqualTo: '공지')
-            .orderBy('publishAt', descending: true) // 최신순
+            .collection('teams')
+            .doc(teamId)
+            .collection('notices')
+            .orderBy('publishAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -69,7 +81,8 @@ class NoticeListPage extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => NoticeDetailPage(postId: doc.id),
+                        builder: (_) =>
+                            NoticeDetailPage(teamId: teamId, noticeId: doc.id),
                       ),
                     );
                   },

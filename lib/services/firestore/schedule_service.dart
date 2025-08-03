@@ -53,4 +53,120 @@ class ScheduleService {
       transaction.update(docRef, {'attendees': attendees});
     });
   }
+
+  /// ✅ 최초 일정 자동 생성 (3개월치)
+  static Future<void> generateInitialSchedules({required String teamId}) async {
+    final now = DateTime.now();
+    final end = DateTime(now.year, now.month + 3, 0);
+    final firestore = FirebaseFirestore.instance;
+
+    for (
+      DateTime date = now;
+      date.isBefore(end);
+      date = date.add(const Duration(days: 1))
+    ) {
+      final weekday = date.weekday;
+
+      // 📘 매주 목요일: 수업
+      if (weekday == DateTime.thursday) {
+        await firestore.collection('classes').add({
+          'teamId': teamId,
+          'date': Timestamp.fromDate(date),
+          'startTime': '20:00',
+          'endTime': '22:00',
+          'status': 'draft',
+          'type': 'regular',
+          'createdAt': Timestamp.now(),
+        });
+      }
+
+      // ⚽ 둘째, 넷째 일요일: 매치
+      if (weekday == DateTime.sunday) {
+        final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
+        if (weekOfMonth == 2 || weekOfMonth == 4) {
+          await firestore.collection('matches').add({
+            'teamId': teamId,
+            'date': Timestamp.fromDate(date),
+            'startTime': '20:00',
+            'endTime': '22:00',
+            'status': 'draft',
+            'type': 'regular',
+            'createdAt': Timestamp.now(),
+          });
+        }
+      }
+    }
+  }
+
+  /// ✅ 매달 1일: 다음 1개월 일정만 생성
+  static Future<void> generateMonthlySchedule({required String teamId}) async {
+    final now = DateTime.now();
+    final targetMonth = DateTime(now.year, now.month + 3, 1);
+    final targetEnd = DateTime(targetMonth.year, targetMonth.month + 1, 0);
+    final firestore = FirebaseFirestore.instance;
+
+    for (
+      DateTime date = targetMonth;
+      date.isBefore(targetEnd);
+      date = date.add(const Duration(days: 1))
+    ) {
+      final weekday = date.weekday;
+
+      // 📘 매주 목요일: 수업
+      if (weekday == DateTime.thursday) {
+        await firestore.collection('classes').add({
+          'teamId': teamId,
+          'date': Timestamp.fromDate(date),
+          'startTime': '20:00',
+          'endTime': '22:00',
+          'status': 'draft',
+          'type': 'regular',
+          'createdAt': Timestamp.now(),
+        });
+      }
+
+      // ⚽ 둘째, 넷째 일요일: 매치
+      if (weekday == DateTime.sunday) {
+        final weekOfMonth = ((date.day - 1) ~/ 7) + 1;
+        if (weekOfMonth == 2 || weekOfMonth == 4) {
+          await firestore.collection('matches').add({
+            'teamId': teamId,
+            'date': Timestamp.fromDate(date),
+            'startTime': '20:00',
+            'endTime': '22:00',
+            'status': 'draft',
+            'type': 'regular',
+            'createdAt': Timestamp.now(),
+          });
+        }
+      }
+    }
+  }
+
+  /// ✅ 다음달 draft 일정 일괄 확정 처리
+  static Future<void> confirmNextMonthSchedules({
+    required String teamId,
+  }) async {
+    final firestore = FirebaseFirestore.instance;
+    final now = DateTime.now();
+    final nextMonthStart = DateTime(now.year, now.month + 1, 1);
+    final nextMonthEnd = DateTime(now.year, now.month + 2, 0);
+
+    for (final collection in ['classes', 'matches']) {
+      final query = await firestore
+          .collection(collection)
+          .where('teamId', isEqualTo: teamId)
+          .where('status', isEqualTo: 'draft')
+          .where(
+            'date',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(nextMonthStart),
+          )
+          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(nextMonthEnd))
+          .get();
+
+      for (final doc in query.docs) {
+        await doc.reference.update({'status': 'regular'});
+      }
+    }
+  }
 }
