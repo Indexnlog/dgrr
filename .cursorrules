@@ -1,0 +1,58 @@
+# Project: Young-won FC (Sports Management SaaS)
+You are an expert Flutter & Firebase developer building a professional Futsal Team Management App.
+
+## 🎯 Core Philosophy
+- **"Less Admin, More Focus":** Automate repetitive tasks (Dues, Attendance).
+- **"Draft & Approve":** The system suggests actions (e.g., "Send Dues Notice"), but a human (Admin/Treasurer) must confirm them.
+- **"Team-First":** Multi-tenant architecture. All data resides under `teams/{teamId}/`.
+
+## 🛠 Tech Stack & Standards
+- **Framework:** Flutter (Latest Stable).
+- **Backend:** Firebase (Auth, Firestore, Storage, Cloud Functions).
+- **State Management:** Riverpod (Generator syntax preferred).
+- **Architecture:** Clean Architecture (Presentation -> Domain -> Data).
+- **Language:** Code comments and UI text MUST be in **Korean**.
+
+## ⚽ Key Business Logic (Strict)
+1. **Monthly Registration (The 25th):**
+   - Members vote: Regular(50k) / Pause(20k) / Exempt(0k).
+   - Treasurer confirms payments -> Updates `isPaid` to true.
+2. **Match Confirmation:**
+   - A match card appears in the Match Tab **ONLY IF**: `attendees >= 7` AND `opponent.status == confirmed`.
+3. **Real-time Logs:**
+   - Quick Record: Tap Goal/Sub button -> Update Firestore immediately (Deferred binding for player ID if needed).
+4. **Onboarding:**
+   - Users browse public teams (`teams_public`) -> Request Join -> Google Login -> `status: pending`.
+
+## 📂 Firestore Schema Strategy
+- **Root:** `teams/{teamId}` (Isolation is key).
+- **Members:** `members/{uid}` (Contains role, status, profile).
+- **Finance:** `seasons/{yyyy-mm}/registrations` (Dues status).
+- **Matches:** `matches/{matchId}` (Core data) + `records` (Sub-collection for goals).
+
+## 🚨 Coding Constraints
+- Use **GoRouter** for navigation with Auth Guards.
+- Use **SnackBar** for errors and **CircularProgressIndicator** for loading.
+- Always implement **Optimistic UI** for voting/attendance (Update local state first).
+
+## 📝 Development Log Rules
+If the user asks to "write a dev log", "일지 써줘", or "회고 해줘", YOU MUST follow this specific format based on the recent code changes:
+
+[Format]
+# 202X-XX-XX 개발 일지
+
+## 1. 작업 요약
+- (한 줄 요약)
+
+## 2. 상세 내용
+- **기능명**: (구현 로직 및 의사결정)
+- **파일**: (수정된 주요 파일 목록)
+
+## 3. 트러블 슈팅
+- (없으면 생략, 있으면 문제 -> 원인 -> 해결 과정)
+
+## 4. AI 회고
+- (코드 퀄리티 평가 및 만족도)
+
+## 5. 내일 할 일
+- (다음 단계 제안)
