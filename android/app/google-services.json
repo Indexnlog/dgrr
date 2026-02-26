@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "27853679688",
+    "project_id": "dgrr-app",
+    "storage_bucket": "dgrr-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:27853679688:android:5f22df99d3636b65c8bc7d",
+        "android_client_info": {
+          "package_name": "com.example.dgrr_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcyvzPW-XST9CPc1Why-XtcOB1xz0uyDk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

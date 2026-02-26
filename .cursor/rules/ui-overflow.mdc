@@ -1,0 +1,16 @@
+---
+description: Flutter UI 레이아웃 overflow 방지 규칙
+globs: lib/**/*.dart
+---
+
+# UI Overflow 방지 규칙
+
+## Row/Column 내 텍스트
+- `Row` 또는 `Column` 안의 `Text`는 **반드시** 다음 중 하나 적용:
+  - `overflow: TextOverflow.ellipsis`
+  - `Expanded` 또는 `Flexible`로 감싸기
+- 긴 문자열(날짜, 장소, 이름 등)은 항상 overflow 처리
+
+## 카드/리스트 아이템
+- `ListView`/`CustomScrollView` 내부 위젯은 `Flexible`/`Expanded`로 가변 공간 처리
+- 고정 너비 대신 `Flexible` 사용 권장

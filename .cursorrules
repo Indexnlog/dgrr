@@ -14,8 +14,12 @@ You are an expert Flutter & Firebase developer building a professional Futsal Te
 - **Language:** Code comments and UI text MUST be in **Korean**.
 
 ## ⚽ Key Business Logic (Strict)
-1. **Monthly Registration (The 25th):**
-   - Members vote: Regular(50k) / Pause(20k) / Exempt(0k).
+1. **Monthly Registration (회비제 2026.1~):**
+   - **등록**: 수업/경기 참가, 월 5만원
+   - **휴회**: 개인 사유 불참, 회원 자격 유지, 월 2만원
+   - **미등록(인정사유)**: 부상·출산 등, 회비 없음
+   - 월별 등록 투표: 매월 20~24일 (다음 달 선택)
+   - 일자별 참석 투표: 매월 25일~말일 (수업 참석 가능 일자 체크)
    - Treasurer confirms payments -> Updates `isPaid` to true.
 2. **Match Confirmation:**
    - A match card appears in the Match Tab **ONLY IF**: `attendees >= 7` AND `opponent.status == confirmed`.
@@ -30,10 +34,18 @@ You are an expert Flutter & Firebase developer building a professional Futsal Te
 - **Finance:** `seasons/{yyyy-mm}/registrations` (Dues status).
 - **Matches:** `matches/{matchId}` (Core data) + `records` (Sub-collection for goals).
 
+## 📱 시뮬레이터 & 빌드 (필수 준수)
+- **앱 실행**: 반드시 `./scripts/run_ios.sh` 사용. `flutter run` 직접 실행 금지.
+- **절대** `flutter run`을 여러 터미널에서 동시에 실행하지 말 것 → Xcode concurrent build 에러.
+- 앱이 안 열리면: `./scripts/run_ios.sh clean` 실행 후 재시도. 상세: `TROUBLESHOOTING.md`.
+- Firebase 에뮬레이터: 기본 비활성화. 사용 시 `--dart-define=USE_FIREBASE_EMULATOR=true`.
+- UI 변경 반영 안 될 때: `Shift+R` (Hot Restart) 또는 `q` 후 `./scripts/run_ios.sh` 재실행.
+
 ## 🚨 Coding Constraints
 - Use **GoRouter** for navigation with Auth Guards.
 - Use **SnackBar** for errors and **CircularProgressIndicator** for loading.
 - Always implement **Optimistic UI** for voting/attendance (Update local state first).
+- **UI overflow 방지**: Row/Column 내 Text는 `overflow: TextOverflow.ellipsis` 또는 `Flexible`/`Expanded` 필수.
 
 ## 📝 Development Log Rules
 If the user asks to "write a dev log", "일지 써줘", or "회고 해줘", YOU MUST follow this specific format based on the recent code changes:

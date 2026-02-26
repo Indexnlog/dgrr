@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 환경 변수 (토큰 등 비밀 정보)
+.env
+.env.local
+.env.*.local

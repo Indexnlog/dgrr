@@ -6,4 +6,7 @@ class AuthCanceledException implements Exception {
 
 abstract class AuthRepository {
   Future<UserCredential> signInWithGoogle();
+
+  /// 에뮬레이터 테스트 전용 익명 로그인
+  Future<UserCredential> signInAnonymously();
 }

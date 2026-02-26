@@ -12,4 +12,9 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<UserCredential> signInWithGoogle() {
     return googleAuthDataSource.signInWithGoogle();
   }
+
+  @override
+  Future<UserCredential> signInAnonymously() {
+    return FirebaseAuth.instance.signInAnonymously();
+  }
 }

@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 에뮬레이터 개발 중: 전체 읽기/쓰기 허용
+    // 운영 배포 전 반드시 팀별 격리 규칙으로 교체할 것
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
