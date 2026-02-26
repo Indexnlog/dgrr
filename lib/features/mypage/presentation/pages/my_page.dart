@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/profile_photo_uploader.dart';
 
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
@@ -10,6 +11,7 @@ import '../../../registrations/data/models/registration_model.dart';
 import '../../../registrations/domain/entities/registration.dart';
 import '../../../registrations/presentation/providers/registration_providers.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
+import '../../../teams/presentation/providers/team_members_provider.dart';
 import '../providers/my_stats_provider.dart';
 
 
@@ -32,7 +34,7 @@ class MyPage extends ConsumerWidget {
           padding: const EdgeInsets.all(20),
           children: [
             const SizedBox(height: 12),
-            _buildProfileCard(user),
+            _buildProfileCard(context, ref, user),
             const SizedBox(height: 20),
             _buildFeeStatusCard(regsAsync),
             const SizedBox(height: 20),
@@ -187,11 +189,16 @@ class MyPage extends ConsumerWidget {
     return fee.toString();
   }
 
-  Widget _buildProfileCard(dynamic user) {
+  Widget _buildProfileCard(BuildContext context, WidgetRef ref, dynamic user) {
     final isAnonymous = user?.isAnonymous == true;
     final initial = isAnonymous
         ? 'T'
-        : (user?.displayName?.substring(0, 1) ?? '?');
+        : (user?.displayName?.isNotEmpty == true
+            ? user.displayName!.substring(0, 1).toUpperCase()
+            : '?');
+    final memberMap = ref.watch(memberMapProvider);
+    final member = user?.uid != null ? memberMap[user!.uid] : null;
+    final photoUrl = member?.photoUrl ?? user?.photoURL;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -202,17 +209,10 @@ class MyPage extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
+          ProfilePhotoUploader(
             radius: 28,
-            backgroundColor: AppTheme.teamRed.withOpacity(0.2),
-            child: Text(
-              initial,
-              style: const TextStyle(
-                color: AppTheme.teamRed,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            photoUrl: photoUrl,
+            initial: initial,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -235,7 +235,6 @@ class MyPage extends ConsumerWidget {
               ],
             ),
           ),
-          Icon(Icons.edit_outlined, color: AppTheme.textMuted, size: 20),
         ],
       ),
     );

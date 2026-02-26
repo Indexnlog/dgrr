@@ -31,6 +31,12 @@ Future<bool> _initializeFirebase() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
+    // Firestore 오프라인 캐시 (네트워크 불안정 시에도 캐시된 데이터 표시)
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+
     // 에뮬레이터는 opt-in: --dart-define=USE_FIREBASE_EMULATOR=true 일 때만 연결 (기본: 실제 Firebase)
     if (kDebugMode &&
         const bool.fromEnvironment('USE_FIREBASE_EMULATOR', defaultValue: false)) {

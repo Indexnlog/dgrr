@@ -5,4 +5,11 @@ abstract class TeamRepository {
     required String teamId,
     required String userId,
   });
+
+  /// 멤버 프로필 사진 URL 업데이트
+  Future<void> updateMemberPhotoUrl({
+    required String teamId,
+    required String memberId,
+    required String photoUrl,
+  });
 }

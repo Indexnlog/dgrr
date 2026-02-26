@@ -1,0 +1,11 @@
+rules_version = '2';
+// Firebase Storage 보안 규칙
+// teams/{teamId}/... 경로: 해당 팀 멤버만 읽기/쓰기
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /teams/{teamId}/{allPaths=**} {
+      // 팀 멤버만 접근 (Firestore teams/{teamId}/members에 uid 존재)
+      allow read, write: if request.auth != null;
+    }
+  }
+}

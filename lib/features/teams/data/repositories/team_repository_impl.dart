@@ -33,4 +33,18 @@ class TeamRepositoryImpl implements TeamRepository {
       // 나머지 필드는 관리자가 승인 후 업데이트
     }, SetOptions(merge: true));
   }
+
+  @override
+  Future<void> updateMemberPhotoUrl({
+    required String teamId,
+    required String memberId,
+    required String photoUrl,
+  }) async {
+    await firestore
+        .collection('teams')
+        .doc(teamId)
+        .collection('members')
+        .doc(memberId)
+        .update({'photoUrl': photoUrl});
+  }
 }
