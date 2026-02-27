@@ -165,6 +165,32 @@ class EventRemoteDataSource {
     });
   }
 
+  /// 최근 완료된 수업 목록 (과거 3개월, 출석 통계용)
+  Stream<List<EventModel>> watchRecentFinishedClasses(
+    String teamId, {
+    int monthsBack = 3,
+    int limit = 50,
+  }) {
+    final now = DateTime.now();
+    final end = DateTime(now.year, now.month, now.day);
+    final start = DateTime(now.year, now.month - monthsBack, 1);
+    final startStr =
+        '${start.year}-${start.month.toString().padLeft(2, '0')}-${start.day.toString().padLeft(2, '0')}';
+    final endStr =
+        '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}';
+
+    return _eventsRef(teamId)
+        .where('type', isEqualTo: 'class')
+        .where('date', isGreaterThanOrEqualTo: startStr)
+        .where('date', isLessThanOrEqualTo: endStr)
+        .orderBy('date', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => EventModel.fromFirestore(doc.id, doc.data()))
+            .toList());
+  }
+
   /// 단일 수업 실시간 스트림
   Stream<EventModel?> watchClass(String teamId, String eventId) {
     return _eventsRef(teamId).doc(eventId).snapshots().map((snap) {

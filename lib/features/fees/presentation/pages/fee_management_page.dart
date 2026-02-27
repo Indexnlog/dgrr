@@ -1,6 +1,12 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
+import '../../../auth/presentation/providers/auth_state_provider.dart';
+import '../../../polls/domain/services/poll_creation_service.dart';
+import '../../../polls/presentation/providers/poll_providers.dart';
 import '../../../registrations/data/models/registration_model.dart';
 import '../../../registrations/domain/entities/registration.dart';
 import '../../../registrations/presentation/providers/registration_providers.dart';
@@ -54,6 +60,8 @@ class FeeManagementPage extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
+              _NextMonthRegistrationDraftCard(),
+              const SizedBox(height: 16),
               _CurrentMonthRegistrationCard(),
               if (fees.isEmpty) ...[
                 const SizedBox(height: 20),
@@ -85,6 +93,175 @@ class FeeManagementPage extends ConsumerWidget {
         error: (e, _) => Center(
             child: Text('오류: $e',
                 style: const TextStyle(color: _DS.textSecondary))),
+      ),
+    );
+  }
+}
+
+/// 다음 달 등록 공지 초안 (20일~24일 투표 생성, Draft & Approve)
+class _NextMonthRegistrationDraftCard extends ConsumerWidget {
+  const _NextMonthRegistrationDraftCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final nextMonthPollAsync = ref.watch(nextMonthMembershipPollProvider);
+    final hasPermission = ref.watch(hasPermissionProvider(Permission.treasurer)) ||
+        ref.watch(hasPermissionProvider(Permission.admin));
+    final teamId = ref.watch(currentTeamIdProvider);
+    final uid = ref.watch(currentUserProvider)?.uid;
+
+    if (!hasPermission || teamId == null || uid == null) {
+      return const SizedBox.shrink();
+    }
+
+    final nextMonth = PollCreationService.nextMonth();
+    final parts = nextMonth.split('-');
+    final year = int.tryParse(parts[0]) ?? DateTime.now().year;
+    final month = int.tryParse(parts[1]) ?? DateTime.now().month;
+    final monthLabel = DateFormat('M월', 'ko_KR').format(DateTime(year, month));
+
+    return nextMonthPollAsync.when(
+      data: (existingPoll) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _DS.bgCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _DS.gold.withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _DS.gold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      '다음 달 등록 공지',
+                      style: TextStyle(
+                        color: _DS.gold,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$year년 $monthLabel',
+                    style: const TextStyle(
+                      color: _DS.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (existingPoll != null) ...[
+                Text(
+                  '등록 투표가 이미 생성되었습니다. (20일~24일 투표 기간)',
+                  style: TextStyle(
+                    color: _DS.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => context.push('/schedule/polls/${existingPoll.pollId}'),
+                  icon: const Icon(Icons.ballot_outlined, size: 18, color: _DS.gold),
+                  label: const Text(
+                    '투표 보기',
+                    style: TextStyle(color: _DS.gold, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ] else ...[
+                Text(
+                  '매월 20일~24일 회원들이 다음 달 등록/휴회/미등록을 선택합니다. 초안을 생성하세요.',
+                  style: TextStyle(
+                    color: _DS.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _CreateDraftButton(teamId: teamId, uid: uid, nextMonth: nextMonth),
+              ],
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox(
+        height: 80,
+        child: Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: _DS.gold),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _CreateDraftButton extends ConsumerStatefulWidget {
+  const _CreateDraftButton({
+    required this.teamId,
+    required this.uid,
+    required this.nextMonth,
+  });
+  final String teamId;
+  final String uid;
+  final String nextMonth;
+
+  @override
+  ConsumerState<_CreateDraftButton> createState() => _CreateDraftButtonState();
+}
+
+class _CreateDraftButtonState extends ConsumerState<_CreateDraftButton> {
+  bool _isCreating = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: _isCreating
+          ? null
+          : () async {
+              setState(() => _isCreating = true);
+              try {
+                final poll = PollCreationService.createMembershipPoll(
+                  targetMonth: widget.nextMonth,
+                  createdBy: widget.uid,
+                );
+                final pollId = await ref
+                    .read(pollDataSourceProvider)
+                    .createPoll(widget.teamId, poll);
+                if (context.mounted) {
+                  ref.invalidate(nextMonthMembershipPollProvider);
+                  context.push('/schedule/polls/$pollId');
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('생성 실패: $e')),
+                  );
+                }
+              } finally {
+                if (mounted) setState(() => _isCreating = false);
+              }
+            },
+      icon: _isCreating
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: _DS.bgDeep),
+            )
+          : const Icon(Icons.add_circle_outline, size: 18),
+      label: Text(_isCreating ? '생성 중...' : '등록 투표 초안 생성'),
+      style: FilledButton.styleFrom(
+        backgroundColor: _DS.gold,
+        foregroundColor: _DS.bgDeep,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       ),
     );
   }
@@ -325,13 +502,47 @@ class _PaymentStatus extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: GestureDetector(
-                  onTap: () {
+                  onTap: () async {
                     final unpaid = registrations
                         .where((r) => r.status != RegistrationStatus.paid)
                         .toList();
                     _showUnpaidListDialog(context, unpaid);
-                    // TODO: Cloud Function sendNudgeToUnpaid 연동 시 푸시 발송
-                    // docs/FCM_NUDGE_연동가이드.md 참고
+                    try {
+                      final callable = FirebaseFunctions.instance
+                          .httpsCallable('sendNudgeToUnpaid');
+                      final result = await callable.call({
+                        'teamId': teamId,
+                        'feeId': feeId,
+                      });
+                      if (context.mounted) {
+                        final sent = result.data is Map
+                            ? (result.data as Map)['sent'] as int? ?? 0
+                            : 0;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              sent > 0
+                                  ? '$sent명에게 회비 알림 발송됨'
+                                  : '발송 가능한 미납자가 없습니다.',
+                            ),
+                          ),
+                        );
+                      }
+                    } on FirebaseFunctionsException catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('알림 발송 실패: ${e.message ?? e.code}'),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('알림 발송 실패: $e')),
+                        );
+                      }
+                    }
                   },
                   child: Row(
                     mainAxisSize: MainAxisSize.min,

@@ -22,15 +22,34 @@ class PollRemoteDataSource {
             .toList());
   }
 
-  /// 모든 투표 (최근순)
-  Stream<List<PollModel>> watchAllPolls(String teamId) {
+  /// 모든 투표 (최근순, 페이지네이션 limit 기본 30)
+  Stream<List<PollModel>> watchAllPolls(String teamId, {int limit = 30}) {
     return _pollsRef(teamId)
         .orderBy('createdAt', descending: true)
-        .limit(20)
+        .limit(limit)
         .snapshots()
         .map((snap) => snap.docs
             .map((doc) => PollModel.fromFirestore(doc.id, doc.data()))
             .toList());
+  }
+
+  /// 특정 월의 월별 등록 투표 조회 (category=membership, targetMonth)
+  Stream<PollModel?> watchMembershipPollForMonth(
+    String teamId,
+    String targetMonth,
+  ) {
+    return _pollsRef(teamId)
+        .where('category', isEqualTo: 'membership')
+        .where('targetMonth', isEqualTo: targetMonth)
+        .limit(1)
+        .snapshots()
+        .map((snap) {
+          if (snap.docs.isEmpty) return null;
+          return PollModel.fromFirestore(
+            snap.docs.first.id,
+            snap.docs.first.data(),
+          );
+        });
   }
 
   /// 단일 투표 실시간 스트림

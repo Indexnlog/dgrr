@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../../core/permissions/permission_checker.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../../events/presentation/providers/event_providers.dart';
 import '../../../registrations/domain/entities/registration.dart';
 import '../../../registrations/presentation/providers/registration_providers.dart';
@@ -56,9 +58,10 @@ class PollDetailPage extends ConsumerWidget {
         loading: () => const Center(
             child: CircularProgressIndicator(
                 color: _DS.teamRed, strokeWidth: 2.5)),
-        error: (e, _) => Center(
-            child: Text('오류: $e',
-                style: const TextStyle(color: _DS.textSecondary))),
+        error: (e, _) => ErrorRetryView(
+            message: '투표를 불러올 수 없습니다',
+            detail: e.toString(),
+            onRetry: () => ref.invalidate(pollDetailProvider(pollId))),
       ),
     );
   }
@@ -192,10 +195,12 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
           }
         }
       }
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _optimisticVotes.clear();
         _optimisticUnvotes.clear();
       });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -311,7 +316,10 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
             padding: const EdgeInsets.only(bottom: 10),
             child: GestureDetector(
               onTap: isActive && _votingOptionId != option.id
-                  ? () => _toggleVote(option.id, isVoted)
+                  ? () {
+                      HapticFeedback.lightImpact();
+                      _toggleVote(option.id, isVoted);
+                    }
                   : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),

@@ -50,6 +50,8 @@ class Match {
     this.participants,
     this.attendees,
     this.absentees,
+    this.lateAttendees,
+    this.lateReasons,
     this.absenceReasons,
     this.ballBringers,
     this.lineup,
@@ -84,6 +86,10 @@ class Match {
   final List<String>? participants;
   final List<String>? attendees;
   final List<String>? absentees;
+  /// 지각 예정자 UID 목록 (참석하되 늦을 예정)
+  final List<String>? lateAttendees;
+  /// 지각 예상 시간 { uid: "10분" }
+  final Map<String, String>? lateReasons;
   /// 불참 사유 { uid: { reason: String, timestamp: DateTime } }
   final Map<String, dynamic>? absenceReasons;
   /// 공 가져가기 자원자 UID 배열 ("저도 들고가요" 방식)
@@ -136,6 +142,8 @@ class Match {
     List<String>? participants,
     List<String>? attendees,
     List<String>? absentees,
+    List<String>? lateAttendees,
+    Map<String, String>? lateReasons,
     Map<String, dynamic>? absenceReasons,
     List<String>? ballBringers,
     List<String>? lineup,
@@ -165,6 +173,8 @@ class Match {
       participants: participants ?? this.participants,
       attendees: attendees ?? this.attendees,
       absentees: absentees ?? this.absentees,
+      lateAttendees: lateAttendees ?? this.lateAttendees,
+      lateReasons: lateReasons ?? this.lateReasons,
       absenceReasons: absenceReasons ?? this.absenceReasons,
       ballBringers: ballBringers ?? this.ballBringers,
       lineup: lineup ?? this.lineup,

@@ -103,6 +103,24 @@ class RoundRecordDataSource {
             .toList());
   }
 
+  /// 경기 전체 기록 조회 (모든 라운드, 골/도움 집계용)
+  Future<List<Record>> fetchAllRecordsForMatch(
+    String teamId,
+    String matchId,
+  ) async {
+    final roundsSnap = await _roundsRef(teamId, matchId).get();
+    final allRecords = <Record>[];
+    for (final roundDoc in roundsSnap.docs) {
+      final recordsSnap = await _recordsRef(teamId, matchId, roundDoc.id)
+          .orderBy('timeOffset')
+          .get();
+      for (final doc in recordsSnap.docs) {
+        allRecords.add(RecordModel.fromFirestore(doc.id, doc.data()));
+      }
+    }
+    return allRecords;
+  }
+
   /// 골 기록 추가 + 라운드 스코어 트랜잭션 업데이트
   Future<void> addGoalRecord({
     required String teamId,

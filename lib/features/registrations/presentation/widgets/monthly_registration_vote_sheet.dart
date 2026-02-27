@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/errors.dart';
@@ -90,7 +91,10 @@ class _MonthlyRegistrationVoteSheet extends ConsumerWidget {
           const SizedBox(height: 24),
           ...MembershipStatus.values.map((status) => _VoteOption(
                 status: status,
-                onTap: () => _submitVote(context, ref, status, user, member),
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _submitVote(context, ref, status, user, member);
+                },
               )),
         ],
       ),

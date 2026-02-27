@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../admin/admin_app.dart';
 import 'router/app_router.dart';
 import 'widgets/fcm_initializer.dart';
 
@@ -9,6 +11,11 @@ class DgrrApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 웹에서 /admin 경로면 어드민 앱 표시
+    if (kIsWeb && _isAdminPath()) {
+      return const AdminApp();
+    }
+
     final router = ref.watch(appRouterProvider);
 
     return FcmInitializer(
@@ -21,5 +28,9 @@ class DgrrApp extends ConsumerWidget {
         routerConfig: router,
       ),
     );
+  }
+
+  bool _isAdminPath() {
+    return Uri.base.path.startsWith('/admin');
   }
 }

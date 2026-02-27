@@ -67,13 +67,18 @@ class MatchRemoteDataSource {
   }
 
   /// 다음(미래) 경기 목록 실시간 스트림 — date 오름차순, 오늘 이후만
-  Stream<List<MatchModel>> watchUpcomingMatches(String teamId) {
+  /// limit: 페이지네이션 (기본 30건)
+  Stream<List<MatchModel>> watchUpcomingMatches(
+    String teamId, {
+    int limit = 30,
+  }) {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
 
     return _matchesRef(teamId)
         .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
         .orderBy('date')
+        .limit(limit)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => MatchModel.fromFirestore(doc.id, doc.data()))
@@ -97,8 +102,15 @@ class MatchRemoteDataSource {
 
       final attendees = Set<String>.from(data['attendees'] ?? []);
       final absentees = Set<String>.from(data['absentees'] ?? []);
+      var lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
+      var lateReasons = Map<String, String>.from(
+        (data['lateReasons'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
+      );
+
       attendees.add(uid);
       absentees.remove(uid);
+      lateAttendees.remove(uid);
+      lateReasons.remove(uid);
 
       final minPlayers = data['minPlayers'] as int? ?? 7;
       final previousStatus = data['status'] as String?;
@@ -112,6 +124,59 @@ class MatchRemoteDataSource {
       tx.update(ref, {
         'attendees': attendees.toList(),
         'absentees': absentees.toList(),
+        'lateAttendees': lateAttendees,
+        'lateReasons': lateReasons,
+        'status': newStatus,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return VoteResult(
+        previousStatus: previousStatus,
+        newStatus: newStatus,
+        attendeeCount: attendees.length,
+        minPlayers: minPlayers,
+      );
+    });
+  }
+
+  /// 지각 참석 투표 (참석 + 지각 예상 시간)
+  Future<VoteResult> voteAttendLate(
+    String teamId,
+    String matchId,
+    String uid,
+    String lateTime,
+  ) async {
+    final ref = _matchesRef(teamId).doc(matchId);
+
+    return firestore.runTransaction<VoteResult>((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw Exception('경기 문서가 존재하지 않습니다');
+      final data = snap.data()!;
+
+      final attendees = Set<String>.from(data['attendees'] ?? []);
+      final absentees = Set<String>.from(data['absentees'] ?? []);
+      final lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
+      final lateReasons = Map<String, String>.from(
+        (data['lateReasons'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
+      );
+
+      attendees.add(uid);
+      absentees.remove(uid);
+      if (!lateAttendees.contains(uid)) lateAttendees.add(uid);
+      lateReasons[uid] = lateTime;
+
+      final minPlayers = data['minPlayers'] as int? ?? 7;
+      final previousStatus = data['status'] as String?;
+      var newStatus = previousStatus;
+      if (attendees.length >= minPlayers && previousStatus == 'pending') {
+        newStatus = 'fixed';
+      }
+
+      tx.update(ref, {
+        'attendees': attendees.toList(),
+        'absentees': absentees.toList(),
+        'lateAttendees': lateAttendees,
+        'lateReasons': lateReasons,
         'status': newStatus,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -142,8 +207,15 @@ class MatchRemoteDataSource {
 
       final attendees = Set<String>.from(data['attendees'] ?? []);
       final absentees = Set<String>.from(data['absentees'] ?? []);
+      var lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
+      var lateReasons = Map<String, String>.from(
+        (data['lateReasons'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
+      );
+
       attendees.remove(uid);
       absentees.add(uid);
+      lateAttendees.remove(uid);
+      lateReasons.remove(uid);
 
       final minPlayers = data['minPlayers'] as int? ?? 7;
       final previousStatus = data['status'] as String?;
@@ -157,6 +229,8 @@ class MatchRemoteDataSource {
       tx.update(ref, {
         'attendees': attendees.toList(),
         'absentees': absentees.toList(),
+        'lateAttendees': lateAttendees,
+        'lateReasons': lateReasons,
         'status': newStatus,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -188,8 +262,15 @@ class MatchRemoteDataSource {
 
       final attendees = Set<String>.from(data['attendees'] ?? []);
       final absentees = Set<String>.from(data['absentees'] ?? []);
+      var lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
+      var lateReasons = Map<String, String>.from(
+        (data['lateReasons'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
+      );
+
       attendees.remove(uid);
       absentees.add(uid);
+      lateAttendees.remove(uid);
+      lateReasons.remove(uid);
 
       final minPlayers = data['minPlayers'] as int? ?? 7;
       final previousStatus = data['status'] as String?;
@@ -210,6 +291,8 @@ class MatchRemoteDataSource {
       tx.update(ref, {
         'attendees': attendees.toList(),
         'absentees': absentees.toList(),
+        'lateAttendees': lateAttendees,
+        'lateReasons': lateReasons,
         'absenceReasons': absenceReasons,
         'status': newStatus,
         'updatedAt': FieldValue.serverTimestamp(),

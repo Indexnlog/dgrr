@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/errors.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../opponents/domain/entities/opponent.dart';
@@ -16,8 +17,10 @@ import '../../domain/entities/round.dart';
 import '../providers/match_detail_providers.dart';
 import '../providers/match_providers.dart';
 import '../../../match_media/presentation/widgets/match_media_section.dart';
+import '../../../../core/permissions/permission_checker.dart';
 import 'lineup_edit_sheet.dart';
 import 'record_modals.dart';
+import '../widgets/match_expense_settlement_sheet.dart';
 
 class _C {
   _C._();
@@ -72,9 +75,10 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
         loading: () => const Center(
           child: CircularProgressIndicator(color: _C.red),
         ),
-        error: (e, _) => Center(
-          child: Text('오류: $e', style: const TextStyle(color: _C.sub)),
-        ),
+        error: (e, _) => ErrorRetryView(
+          message: '경기를 불러올 수 없습니다',
+          detail: e.toString(),
+          onRetry: () => ref.invalidate(matchDetailProvider(widget.matchId))),
       ),
       floatingActionButton: matchAsync.value != null
           ? _buildFab(matchAsync.value!)
@@ -912,6 +916,13 @@ class _GameControlBar extends ConsumerWidget {
                   }
                 }
               },
+            ),
+          if (gameStatus == GameStatus.finished &&
+              (PermissionChecker.isTreasurer(ref) || PermissionChecker.isAdmin(ref)))
+            _ActionButton(
+              label: '경비 정산',
+              color: _C.gold,
+              onTap: () => showMatchExpenseSettlementSheet(context, match: match),
             ),
         ],
       ),

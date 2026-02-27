@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../domain/entities/match.dart';
 import '../providers/match_providers.dart';
 
@@ -97,22 +98,30 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
                       ),
                     );
                   }
-                  return ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final match = filtered[index];
-                      return _MatchListTile(match: match, index: index);
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      ref.invalidate(upcomingMatchesProvider);
                     },
+                    color: AppTheme.teamRed,
+                    child: ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final match = filtered[index];
+                        return _MatchListTile(match: match, index: index);
+                      },
+                    ),
                   );
                 },
                 loading: () => const Center(
                   child: CircularProgressIndicator(color: AppTheme.accentLime, strokeWidth: 2),
                 ),
-                error: (e, _) => Center(
-                  child: Text('$e', style: const TextStyle(color: AppTheme.textSecondary)),
+                error: (e, _) => ErrorRetryView(
+                  message: '경기 목록을 불러올 수 없습니다',
+                  detail: e.toString(),
+                  onRetry: () => ref.invalidate(upcomingMatchesProvider),
                 ),
               ),
             ),

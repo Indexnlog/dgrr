@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/permissions/permission_checker.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../domain/entities/poll.dart';
 import '../providers/poll_providers.dart';
 
@@ -72,9 +73,10 @@ class PollListPage extends ConsumerWidget {
         loading: () => const Center(
             child: CircularProgressIndicator(
                 color: _DS.teamRed, strokeWidth: 2.5)),
-        error: (e, _) => Center(
-            child: Text('오류: $e',
-                style: const TextStyle(color: _DS.textSecondary))),
+        error: (e, _) => ErrorRetryView(
+            message: '투표 목록을 불러올 수 없습니다',
+            detail: e.toString(),
+            onRetry: () => ref.invalidate(allPollsProvider)),
       ),
     );
   }

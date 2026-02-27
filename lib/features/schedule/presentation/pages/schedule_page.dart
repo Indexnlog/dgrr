@@ -25,9 +25,16 @@ class SchedulePage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(monthlyMatchesProvider);
+            ref.invalidate(monthlyClassesForCalendarProvider);
+            ref.invalidate(upcomingReservationNoticesProvider);
+          },
+          color: AppTheme.teamRed,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
             SliverToBoxAdapter(child: _buildHeader(context, ref)),
             SliverToBoxAdapter(child: _buildCalendar(ref, focusedMonth, selectedDate, scheduleByDate)),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -55,6 +62,7 @@ class SchedulePage extends ConsumerWidget {
                 ),
               ),
           ],
+        ),
         ),
       ),
     );

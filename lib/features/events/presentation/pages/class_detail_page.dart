@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../auth/presentation/providers/auth_state_provider.dart';
@@ -411,7 +412,10 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
           isActive: myStatus == AttendeeStatus.attending,
           color: _DS.attendGreen,
           isLoading: _isVoting,
-          onTap: () => _handleVote(AttendeeStatus.attending),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _handleVote(AttendeeStatus.attending);
+          },
         ),
         const SizedBox(width: 8),
         _VoteButton(
@@ -421,7 +425,10 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
           isActive: myStatus == AttendeeStatus.late,
           color: _DS.gold,
           isLoading: _isVoting,
-          onTap: _showLateTimeDialog,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _showLateTimeDialog();
+          },
         ),
         const SizedBox(width: 8),
         _VoteButton(
@@ -431,7 +438,10 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
           isActive: myStatus == AttendeeStatus.absent,
           color: _DS.absentRed,
           isLoading: _isVoting,
-          onTap: () => _showAbsentReasonDialog(),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _showAbsentReasonDialog();
+          },
         ),
       ],
     );

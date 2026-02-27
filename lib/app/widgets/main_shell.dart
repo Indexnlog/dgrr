@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/offline_banner.dart';
 import '../../features/matches/presentation/providers/match_providers.dart';
 import '../../features/notifications/presentation/providers/fcm_provider.dart';
 import 'app_top_bar.dart';
@@ -34,7 +35,9 @@ class _MainShellState extends ConsumerState<MainShell> {
       body: Column(
         children: [
           const AppTopBar(),
-          Expanded(child: widget.navigationShell),
+          Expanded(
+            child: OfflineBanner(child: widget.navigationShell),
+          ),
         ],
       ),
       bottomNavigationBar: Container(

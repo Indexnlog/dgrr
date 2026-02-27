@@ -49,6 +49,8 @@ class MatchModel extends Match {
     super.participants,
     super.attendees,
     super.absentees,
+    super.lateAttendees,
+    super.lateReasons,
     super.absenceReasons,
     super.ballBringers,
     super.lineup,
@@ -97,6 +99,13 @@ class MatchModel extends Match {
           : null,
       absentees: json['absentees'] != null
           ? List<String>.from(json['absentees'] as List)
+          : null,
+      lateAttendees: json['lateAttendees'] != null
+          ? List<String>.from(json['lateAttendees'] as List)
+          : null,
+      lateReasons: json['lateReasons'] != null
+          ? Map<String, String>.from(
+              (json['lateReasons'] as Map).map((k, v) => MapEntry(k.toString(), v.toString())))
           : null,
       absenceReasons: json['absenceReasons'] != null
           ? Map<String, dynamic>.from(json['absenceReasons'] as Map)
@@ -149,6 +158,8 @@ class MatchModel extends Match {
       if (lineupAnnouncedAt != null) 'lineupAnnouncedAt': Timestamp.fromDate(lineupAnnouncedAt!),
       'attendees': attendees ?? [],
       'absentees': absentees ?? [],
+      if (lateAttendees != null) 'lateAttendees': lateAttendees,
+      if (lateReasons != null) 'lateReasons': lateReasons,
       if (absenceReasons != null) 'absenceReasons': absenceReasons,
       if (ballBringers != null) 'ballBringers': ballBringers,
       if (createdBy != null) 'createdBy': createdBy,

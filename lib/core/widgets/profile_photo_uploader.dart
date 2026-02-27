@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -103,7 +104,7 @@ class _ProfilePhotoUploaderState extends ConsumerState<ProfilePhotoUploader> {
             backgroundColor: AppTheme.teamRed.withValues(alpha: 0.2),
             backgroundImage:
                 photoUrl != null && photoUrl.isNotEmpty
-                    ? NetworkImage(photoUrl)
+                    ? CachedNetworkImageProvider(photoUrl)
                     : null,
             child:
                 photoUrl == null || photoUrl.isEmpty

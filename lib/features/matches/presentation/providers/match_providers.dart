@@ -27,7 +27,9 @@ bool _shouldShowMatchCard(MatchModel m) {
 }
 
 /// 다가오는 경기 목록 실시간 스트림 (성사된 경기만 표시)
-final upcomingMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
+/// autoDispose: 매치 탭 벗어나면 구독 해제
+final upcomingMatchesProvider =
+    StreamProvider.autoDispose<List<MatchModel>>((ref) {
   final teamId = ref.watch(currentTeamIdProvider);
   if (teamId == null) return const Stream.empty();
 
@@ -65,6 +67,32 @@ Future<void> voteAttend(
       .voteAttend(teamId, match.matchId, uid);
 
   // 성사 전환 시 Telegram 알림
+  if (result.didBecomeFixed && match.date != null) {
+    final notifier = ref.read(matchNotificationProvider);
+    await notifier.notifyMatchFixed(
+      matchDate: match.date!,
+      currentCount: result.attendeeCount,
+      minPlayers: result.minPlayers,
+      opponentName: match.opponentName,
+      location: match.location,
+    );
+  }
+}
+
+/// 지각 참석 투표 (참석 + 지각 예상 시간)
+Future<void> voteAttendLate(
+  WidgetRef ref,
+  Match match,
+  String uid,
+  String lateTime,
+) async {
+  final teamId = ref.read(currentTeamIdProvider);
+  if (teamId == null) return;
+
+  final result = await ref
+      .read(matchDataSourceProvider)
+      .voteAttendLate(teamId, match.matchId, uid, lateTime);
+
   if (result.didBecomeFixed && match.date != null) {
     final notifier = ref.read(matchNotificationProvider);
     await notifier.notifyMatchFixed(

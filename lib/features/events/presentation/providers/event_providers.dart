@@ -36,6 +36,16 @@ final monthlyClassesProvider =
       .watchClassesInRange(teamId, startStr, endStr);
 });
 
+/// 최근 완료된 수업 목록 (출석 통계용)
+final recentFinishedClassesProvider =
+    StreamProvider<List<EventModel>>((ref) {
+  final teamId = ref.watch(currentTeamIdProvider);
+  if (teamId == null) return const Stream.empty();
+  return ref
+      .watch(eventDataSourceProvider)
+      .watchRecentFinishedClasses(teamId);
+});
+
 /// 단일 수업 상세 스트림
 final classDetailProvider =
     StreamProvider.family<EventModel?, String>((ref, eventId) {

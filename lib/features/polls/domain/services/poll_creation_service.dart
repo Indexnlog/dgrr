@@ -49,7 +49,7 @@ class PollCreationService {
 
     return PollModel(
       pollId: '',
-      title: '${year}년 $monthLabel 등록 여부 투표',
+      title: '$year년 $monthLabel 등록 여부 투표',
       description:
           '다음 달 등록/휴회/미등록(인정사유) 중 선택해 주세요. 기간: 매월 20일~24일',
       type: PollType.option,
@@ -106,7 +106,7 @@ class PollCreationService {
 
     return PollModel(
       pollId: '',
-      title: '${year}년 $monthLabel 수업 참석 일자 투표',
+      title: '$year년 $monthLabel 수업 참석 일자 투표',
       description:
           '해당 월 수업 일정 중 참석 가능한 날짜를 체크해 주세요. 코치님께서 수업 구성에 활용합니다. 기간: 매월 25일~말일',
       type: PollType.date,

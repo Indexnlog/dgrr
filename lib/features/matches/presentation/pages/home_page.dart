@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/card_skeleton.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../../core/permissions/permission_checker.dart';
@@ -30,6 +33,8 @@ class _HomePageState extends ConsumerState<HomePage>
     with SingleTickerProviderStateMixin {
   bool _seeded = false;
   late AnimationController _pulseController;
+  final _matchSearchController = TextEditingController();
+  String _matchSearchQuery = '';
 
   @override
   void initState() {
@@ -38,6 +43,9 @@ class _HomePageState extends ConsumerState<HomePage>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
+    _matchSearchController.addListener(() {
+      setState(() => _matchSearchQuery = _matchSearchController.text);
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!_seeded) {
@@ -50,6 +58,7 @@ class _HomePageState extends ConsumerState<HomePage>
   @override
   void dispose() {
     _pulseController.dispose();
+    _matchSearchController.dispose();
     super.dispose();
   }
 
@@ -69,8 +78,24 @@ class _HomePageState extends ConsumerState<HomePage>
           data: (matches) {
             final canManagePosts =
                 PermissionChecker.isAdmin(ref) || PermissionChecker.isCoach(ref);
-            return CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
+            final q = _matchSearchQuery.toLowerCase().trim();
+            final filteredMatches = q.isEmpty
+                ? matches
+                : matches.where((m) {
+                    final opp = (m.opponentName ?? '').toLowerCase();
+                    final loc = (m.location ?? '').toLowerCase();
+                    return opp.contains(q) || loc.contains(q);
+                  }).toList();
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(upcomingMatchesProvider);
+                ref.invalidate(activePollsProvider);
+                ref.invalidate(recentPostsProvider);
+                ref.invalidate(upcomingReservationNoticesProvider);
+              },
+              color: AppTheme.teamRed,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverToBoxAdapter(
                     child: _buildGreetingHeader(currentUser, canManagePosts)),
@@ -93,12 +118,19 @@ class _HomePageState extends ConsumerState<HomePage>
                   SliverToBoxAdapter(
                     child: _buildQuickStats(matches, allMembers.length),
                   ),
-                if (matches.isEmpty)
-                  const SliverFillRemaining(
+                if (matches.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _buildMatchSearchBar(),
+                  ),
+                if (filteredMatches.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
                     child: Center(
                       child: Text(
-                        '예정된 경기가 없습니다',
-                        style: TextStyle(
+                        matches.isEmpty
+                            ? '예정된 경기가 없습니다'
+                            : '검색 결과가 없습니다',
+                        style: const TextStyle(
                           color: AppTheme.textSecondary,
                           fontSize: 16,
                           letterSpacing: 0.5,
@@ -117,36 +149,40 @@ class _HomePageState extends ConsumerState<HomePage>
                         (context, index) => Padding(
                           padding: const EdgeInsets.only(bottom: 20),
                           child: _MatchCard(
-                            match: matches[index],
+                            match: filteredMatches[index],
                             uid: currentUser?.uid,
                             isNext: index == 0,
                             pulseAnimation: _pulseController,
                           ),
                         ),
-                        childCount: matches.length,
+                        childCount: filteredMatches.length,
                       ),
                     ),
                   ),
                 ],
               ],
+            ),
             );
           },
-          loading: () => const Center(
-            child: CircularProgressIndicator(
-              color: AppTheme.teamRed,
-              strokeWidth: 2.5,
-            ),
+          loading: () => ListView(
+            padding: const EdgeInsets.all(20),
+            children: const [
+              CardSkeleton(height: 100),
+              SizedBox(height: 20),
+              CardSkeleton(height: 180),
+              SizedBox(height: 20),
+              CardSkeleton(height: 180),
+            ],
           ),
-          error: (e, _) => Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, color: AppTheme.absentRed, size: 48),
-                const SizedBox(height: 12),
-                Text('데이터를 불러올 수 없습니다',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 16)),
-              ],
-            ),
+          error: (e, _) => ErrorRetryView(
+            message: '데이터를 불러올 수 없습니다',
+            detail: e.toString(),
+            onRetry: () {
+              ref.invalidate(upcomingMatchesProvider);
+              ref.invalidate(activePollsProvider);
+              ref.invalidate(recentPostsProvider);
+              ref.invalidate(upcomingReservationNoticesProvider);
+            },
           ),
         ),
       ),
@@ -457,6 +493,28 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
+  Widget _buildMatchSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: TextField(
+        controller: _matchSearchController,
+        style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: '상대팀·장소 검색',
+          hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+          prefixIcon: Icon(Icons.search, size: 20, color: AppTheme.textMuted),
+          filled: true,
+          fillColor: AppTheme.surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionLabel(String label) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
@@ -511,6 +569,8 @@ class _MatchCard extends ConsumerStatefulWidget {
 class _MatchCardState extends ConsumerState<_MatchCard> {
   /// Optimistic UI: null=없음, true=참석, false=불참
   bool? _optimisticVote;
+  /// Optimistic UI: 지각 시 예상 시간 (예: "10분")
+  String? _optimisticLateReason;
   /// Optimistic UI: 공 가져가기 자원
   bool? _optimisticBallBring;
 
@@ -540,16 +600,144 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
       return;
     }
 
-    // Optimistic UI: 바로 반영
-    setState(() => _optimisticVote = true);
+    // 참석: 참석 / 지각 선택 다이얼로그
+    _showAttendChoiceDialog();
+  }
+
+  void _showAttendChoiceDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          '참석 방식을 선택하세요',
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _AttendChoiceButton(
+              label: '참석',
+              icon: Icons.check_circle_outline,
+              onTap: () {
+                Navigator.pop(ctx);
+                _doVoteAttend();
+              },
+            ),
+            const SizedBox(height: 10),
+            _AttendChoiceButton(
+              label: '지각',
+              icon: Icons.watch_later_outlined,
+              onTap: () {
+                Navigator.pop(ctx);
+                _showLateTimeDialog();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLateTimeDialog() {
+    const options = ['5분', '10분', '15분', '20분', '30분'];
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          '지각 예상 시간',
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: options.map((opt) {
+            return GestureDetector(
+              onTap: () {
+                Navigator.pop(ctx);
+                _doVoteAttendLate(opt);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.divider),
+                ),
+                child: Text(
+                  opt,
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _doVoteAttend() async {
+    setState(() {
+      _optimisticVote = true;
+      _optimisticLateReason = null;
+    });
     try {
       await voteAttend(ref, widget.match, widget.uid!);
-      if (mounted) setState(() => _optimisticVote = null);
+      if (mounted) {
+        setState(() {
+        _optimisticVote = null;
+        _optimisticLateReason = null;
+      });
+      }
     } catch (e) {
       if (mounted) {
-        setState(() => _optimisticVote = null);
+        setState(() {
+          _optimisticVote = null;
+          _optimisticLateReason = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('참석 반영 실패: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _doVoteAttendLate(String lateTime) async {
+    setState(() {
+      _optimisticVote = true;
+      _optimisticLateReason = lateTime;
+    });
+    try {
+      await voteAttendLate(ref, widget.match, widget.uid!, lateTime);
+      if (mounted) {
+        setState(() {
+        _optimisticVote = null;
+        _optimisticLateReason = null;
+      });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _optimisticVote = null;
+          _optimisticLateReason = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('지각 반영 실패: $e')),
         );
       }
     }
@@ -697,12 +885,20 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     final match = widget.match;
     var attendees = List<String>.from(match.attendees ?? []);
     var absentees = List<String>.from(match.absentees ?? []);
+    var lateAttendees = List<String>.from(match.lateAttendees ?? []);
+    var lateReasons = Map<String, String>.from(match.lateReasons ?? {});
     var ballBringers = List<String>.from(match.ballBringers ?? []);
     if (_optimisticVote != null && widget.uid != null) {
       attendees = attendees.where((u) => u != widget.uid).toList();
       absentees = absentees.where((u) => u != widget.uid).toList();
+      lateAttendees = lateAttendees.where((u) => u != widget.uid).toList();
+      lateReasons = Map.from(lateReasons)..remove(widget.uid);
       if (_optimisticVote!) {
         attendees = [...attendees, widget.uid!];
+        if (_optimisticLateReason != null) {
+          lateAttendees = [...lateAttendees, widget.uid!];
+          lateReasons = {...lateReasons, widget.uid!: _optimisticLateReason!};
+        }
       } else {
         absentees = [...absentees, widget.uid!];
       }
@@ -714,6 +910,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
       }
     }
     final isAttending = widget.uid != null && attendees.contains(widget.uid);
+    final isLate = widget.uid != null && lateAttendees.contains(widget.uid);
     final isAbsent = widget.uid != null && absentees.contains(widget.uid);
     final memberMap = ref.watch(memberMapProvider);
     final allMembers = ref.watch(teamMembersProvider).value ?? [];
@@ -754,14 +951,27 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                   match.effectiveMinPlayers,
                 ),
                 const SizedBox(height: 14),
-                _buildAttendeeList(attendees, notVotedCount, memberMap),
+                _buildAttendeeList(
+                  attendees,
+                  notVotedCount,
+                  memberMap,
+                  lateReasons: lateReasons,
+                ),
+                if (absentees.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _buildAbsenteeList(
+                    absentees,
+                    memberMap,
+                    absenceReasons: match.absenceReasons ?? {},
+                  ),
+                ],
                 const SizedBox(height: 16),
                 _buildBallBringerSection(
                   match.copyWith(ballBringers: ballBringers),
                   memberMap,
                 ),
                 const SizedBox(height: 20),
-                _buildVoteButtons(isAttending, isAbsent),
+                _buildVoteButtons(isAttending, isLate, isAbsent),
               ],
             ),
           ),
@@ -1042,8 +1252,9 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
   Widget _buildAttendeeList(
     List<String> attendeeUids,
     int notVotedCount,
-    Map<String, Member> memberMap,
-  ) {
+    Map<String, Member> memberMap, {
+    Map<String, String> lateReasons = const {},
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1097,13 +1308,16 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
               final member = memberMap[uid];
               final name = member?.uniformName ?? member?.name ?? uid.substring(0, 4);
               final number = member?.number;
+              final lateLabel = lateReasons[uid];
+              final isLateChip = lateLabel != null;
+              final chipColor = isLateChip ? AppTheme.gold : AppTheme.attendGreen;
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppTheme.attendGreen.withValues(alpha:0.12),
+                  color: chipColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppTheme.attendGreen.withValues(alpha:0.25),
+                    color: chipColor.withValues(alpha: 0.25),
                     width: 0.5,
                   ),
                 ),
@@ -1114,7 +1328,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                       Text(
                         '#$number',
                         style: TextStyle(
-                          color: AppTheme.attendGreen.withValues(alpha:0.7),
+                          color: chipColor.withValues(alpha: 0.7),
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1122,7 +1336,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                       const SizedBox(width: 4),
                     ],
                     Text(
-                      name,
+                      lateLabel != null ? '$name ($lateLabel 지각)' : name,
                       style: const TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 12,
@@ -1138,22 +1352,111 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     );
   }
 
+  Widget _buildAbsenteeList(
+    List<String> absenteeUids,
+    Map<String, Member> memberMap, {
+    Map<String, dynamic> absenceReasons = const {},
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              '불참',
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '${absenteeUids.length}명',
+              style: TextStyle(
+                color: AppTheme.absentRed.withValues(alpha: 0.9),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: absenteeUids.map((uid) {
+            final member = memberMap[uid];
+            final name = member?.uniformName ?? member?.name ?? uid.substring(0, 4);
+            final number = member?.number;
+            final reasonData = absenceReasons[uid];
+            final reason = reasonData is Map
+                ? (reasonData['reason'] as String? ?? '')
+                : (reasonData?.toString() ?? '');
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppTheme.absentRed.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppTheme.absentRed.withValues(alpha: 0.2),
+                  width: 0.5,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (number != null) ...[
+                    Text(
+                      '#$number',
+                      style: TextStyle(
+                        color: AppTheme.absentRed.withValues(alpha: 0.6),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    reason.isNotEmpty ? '$name ($reason)' : name,
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBallBringerSection(
     Match match,
     Map<String, Member> memberMap,
   ) {
     final ballBringers = match.ballBringers ?? [];
     final isBringing = widget.uid != null && ballBringers.contains(widget.uid);
+    final ballOk = ballBringers.isNotEmpty;
+    final minPlayers = match.effectiveMinPlayers;
+    final attendCount = (match.attendees ?? []).length;
+    final attendOk = attendCount >= minPlayers;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.sports_soccer, size: 14, color: AppTheme.textMuted),
+            Icon(Icons.checklist_rounded, size: 14, color: AppTheme.textMuted),
             const SizedBox(width: 6),
             Text(
-              '공 가져오실 분?',
+              '경기 전 체크리스트',
               style: TextStyle(
                 color: AppTheme.textSecondary,
                 fontSize: 12,
@@ -1162,7 +1465,65 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
+        // 공 가져가기 체크
+        Row(
+          children: [
+            Icon(
+              ballOk ? Icons.check_circle : Icons.radio_button_unchecked,
+              size: 18,
+              color: ballOk ? AppTheme.attendGreen : AppTheme.textMuted,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '공 가져가기 (1명 이상)',
+              style: TextStyle(
+                color: ballOk ? AppTheme.textPrimary : AppTheme.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              ballOk ? '${ballBringers.length}명 ✓' : '미충족',
+              style: TextStyle(
+                color: ballOk ? AppTheme.attendGreen : AppTheme.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        // 참석 인원 체크
+        Row(
+          children: [
+            Icon(
+              attendOk ? Icons.check_circle : Icons.radio_button_unchecked,
+              size: 18,
+              color: attendOk ? AppTheme.attendGreen : AppTheme.textMuted,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '참석 인원 ($minPlayers명 이상)',
+              style: TextStyle(
+                color: attendOk ? AppTheme.textPrimary : AppTheme.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              attendOk ? '$attendCount명 ✓' : '$attendCount/$minPlayers명',
+              style: TextStyle(
+                color: attendOk ? AppTheme.attendGreen : AppTheme.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         Row(
           children: [
             GestureDetector(
@@ -1232,53 +1593,59 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
             ],
           ],
         ),
+        const SizedBox(height: 8),
       ],
     );
   }
 
-  Widget _buildVoteButtons(bool isAttending, bool isAbsent) {
+  Widget _buildVoteButtons(bool isAttending, bool isLate, bool isAbsent) {
+    final attendActive = isAttending;
+    final attendLabel = isLate ? '지각' : '참석';
+    final attendColor = attendActive ? AppTheme.attendGreen : AppTheme.surface;
     return Row(
       children: [
         Expanded(
           child: GestureDetector(
-            onTap: () => _handleVote(true),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _handleVote(true);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
               height: 52,
               decoration: BoxDecoration(
-                color: isAttending ? AppTheme.attendGreen : AppTheme.surface,
+                color: attendColor,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isAttending ? AppTheme.attendGreen : AppTheme.divider,
+                  color: attendActive ? AppTheme.attendGreen : AppTheme.divider,
                   width: 1.5,
                 ),
               ),
               child: Center(
                 child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isAttending
-                                ? Icons.check_circle
-                                : Icons.check_circle_outline,
-                            size: 20,
-                            color:
-                                isAttending ? Colors.white : AppTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '참석',
-                            style: TextStyle(
-                              color: isAttending
-                                  ? Colors.white
-                                  : AppTheme.textSecondary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      attendActive
+                          ? (isLate ? Icons.watch_later : Icons.check_circle)
+                          : Icons.check_circle_outline,
+                      size: 20,
+                      color: attendActive ? Colors.white : AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      attendLabel,
+                      style: TextStyle(
+                        color: attendActive
+                            ? Colors.white
+                            : AppTheme.textSecondary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                       ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1286,7 +1653,10 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
         const SizedBox(width: 12),
         Expanded(
           child: GestureDetector(
-            onTap: () => _handleVote(false),
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _handleVote(false);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
@@ -1335,6 +1705,48 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
 }
 
 // ── 서브 위젯 ──
+
+class _AttendChoiceButton extends StatelessWidget {
+  const _AttendChoiceButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.divider),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: AppTheme.textSecondary),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _InfoCell extends StatelessWidget {
   const _InfoCell({

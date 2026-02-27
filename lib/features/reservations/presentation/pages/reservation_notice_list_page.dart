@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:dgrr_app/core/widgets/error_retry_view.dart';
 import '../../../teams/presentation/providers/team_members_provider.dart';
 import '../../domain/entities/reservation_notice.dart';
 import '../../data/models/reservation_notice_model.dart';
@@ -92,19 +93,10 @@ class ReservationNoticeListPage extends ConsumerWidget {
         loading: () => const Center(
           child: CircularProgressIndicator(color: _DS.teamRed, strokeWidth: 2.5),
         ),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, color: _DS.absentRed, size: 48),
-              const SizedBox(height: 12),
-              Text(
-                '데이터를 불러올 수 없습니다',
-                style: TextStyle(color: _DS.textSecondary, fontSize: 15),
-              ),
-            ],
-          ),
-        ),
+        error: (e, _) => ErrorRetryView(
+          message: '공지 목록을 불러올 수 없습니다',
+          detail: e.toString(),
+          onRetry: () => ref.invalidate(upcomingReservationNoticesProvider)),
       ),
     );
   }

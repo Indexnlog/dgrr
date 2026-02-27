@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/widgets/lazy_indexed_stack.dart';
 import '../../features/auth/presentation/providers/auth_state_provider.dart';
 import '../../features/events/presentation/pages/class_detail_page.dart';
 import '../../features/fees/presentation/pages/fee_management_page.dart';
@@ -60,9 +61,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'team-select',
         builder: (context, state) => const TeamSelectPage(),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
         builder: (context, state, navigationShell) {
           return MainShell(navigationShell: navigationShell);
+        },
+        navigatorContainerBuilder: (context, navigationShell, children) {
+          return LazyIndexedStack(
+            navigationShell: navigationShell,
+            children: children,
+          );
         },
         branches: [
           StatefulShellBranch(
