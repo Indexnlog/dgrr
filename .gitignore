@@ -48,3 +48,6 @@ app.*.map.json
 .env
 .env.local
 .env.*.local
+
+# 자동 푸시 로그
+scripts/auto_push*.log

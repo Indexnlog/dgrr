@@ -46,3 +46,4 @@ flutter run -d ios
 - `lib/features/` — 기능별 모듈 (auth, matches, polls, schedule 등)
 - `lib/app/` — 라우터, 공통 위젯
 - `lib/core/` — 테마, 권한, 에러
+
