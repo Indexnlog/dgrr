@@ -13,6 +13,7 @@ import '../../../registrations/presentation/providers/registration_providers.dar
 import '../../../registrations/presentation/widgets/monthly_registration_vote_sheet.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_members_provider.dart';
+import '../../../teams/presentation/providers/team_providers.dart';
 import '../providers/my_stats_provider.dart';
 
 
@@ -50,7 +51,7 @@ class MyPage extends ConsumerWidget {
             const SizedBox(height: 20),
             _buildMatchPerformanceCard(context, ref, user?.uid),
             const SizedBox(height: 20),
-            _buildMenuSection(context),
+            _buildMenuSection(context, ref),
             const SizedBox(height: 32),
             _buildLogout(ref),
           ],
@@ -710,7 +711,7 @@ class MyPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildMenuSection(BuildContext context) {
+  Widget _buildMenuSection(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
         _MenuItem(
@@ -725,9 +726,20 @@ class MyPage extends ConsumerWidget {
           onTap: () => context.push('/my/grounds'),
         ),
         _MenuItem(
-          icon: Icons.article_outlined,
-          label: '공식 문서',
-          subtitle: '준비 중',
+          icon: Icons.menu_book_outlined,
+          label: '영원FC 안내',
+          subtitle: '회칙·회비·구장',
+          onTap: () => context.push('/welcome'),
+        ),
+        _MenuItem(
+          icon: Icons.privacy_tip_outlined,
+          label: '개인정보처리방침',
+          onTap: () => context.push('/my/privacy'),
+        ),
+        _MenuItem(
+          icon: Icons.description_outlined,
+          label: '이용약관',
+          onTap: () => context.push('/my/terms'),
         ),
         _MenuItem(
           icon: Icons.notifications_outlined,
@@ -736,10 +748,61 @@ class MyPage extends ConsumerWidget {
         ),
         _MenuItem(
           icon: Icons.settings_outlined,
-          label: '설정',
-          subtitle: '준비 중',
+          label: '팀 설정',
+          subtitle: '운영진',
+          onTap: () => context.push('/my/team-settings'),
+        ),
+        _MenuItem(
+          icon: Icons.logout_outlined,
+          label: '팀 탈퇴',
+          subtitle: '주의',
+          onTap: () => _showLeaveTeamDialog(context, ref),
         ),
       ],
+    );
+  }
+
+  void _showLeaveTeamDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('팀 탈퇴'),
+        content: const Text(
+          '정말 팀을 탈퇴하시겠습니까? 탈퇴 후에는 팀 데이터에 접근할 수 없습니다.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final teamId = ref.read(currentTeamIdProvider);
+              final uid = ref.read(currentUserProvider)?.uid;
+              if (teamId == null || uid == null) return;
+              try {
+                await ref.read(teamRepositoryProvider).leaveTeam(
+                      teamId: teamId,
+                      memberId: uid,
+                    );
+                await ref.read(currentTeamIdProvider.notifier).clearTeam();
+                if (context.mounted) {
+                  context.go('/');
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('탈퇴 실패: $e')),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('탈퇴'),
+          ),
+        ],
+      ),
     );
   }
 

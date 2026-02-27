@@ -49,25 +49,38 @@ class PollListPage extends ConsumerWidget {
       body: pollsAsync.when(
         data: (polls) {
           if (polls.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.ballot_outlined,
-                      size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
-                  const SizedBox(height: 12),
-                  Text('아직 투표가 없습니다',
-                      style: TextStyle(color: _DS.textMuted, fontSize: 14)),
-                ],
+            return RefreshIndicator(
+              onRefresh: () async => ref.invalidate(allPollsProvider),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height - 200,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.ballot_outlined,
+                            size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
+                        const SizedBox(height: 12),
+                        Text('아직 투표가 없습니다',
+                            style: TextStyle(color: _DS.textMuted, fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             );
           }
-          return ListView.separated(
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(allPollsProvider),
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(20),
             itemCount: polls.length,
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) =>
                 _PollCard(poll: polls[index]),
+            ),
           );
         },
         loading: () => const Center(

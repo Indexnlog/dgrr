@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/permissions/permission_checker.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../data/models/post_model.dart';
 import '../providers/post_providers.dart';
 
@@ -56,21 +57,33 @@ class PostListPage extends ConsumerWidget {
       body: postsAsync.when(
         data: (posts) {
           if (posts.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.campaign_outlined, color: _DS.textMuted, size: 48),
-                  const SizedBox(height: 12),
-                  Text(
-                    '등록된 공지가 없습니다',
-                    style: TextStyle(color: _DS.textSecondary, fontSize: 15),
+            return RefreshIndicator(
+              onRefresh: () async => ref.invalidate(recentPostsProvider),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height - 200,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.campaign_outlined, color: _DS.textMuted, size: 48),
+                        const SizedBox(height: 12),
+                        Text(
+                          '등록된 공지가 없습니다',
+                          style: TextStyle(color: _DS.textSecondary, fontSize: 15),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
             );
           }
-          return ListView.builder(
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(recentPostsProvider),
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
             itemCount: posts.length,
             itemBuilder: (context, index) {
@@ -80,6 +93,7 @@ class PostListPage extends ConsumerWidget {
                 child: _PostCard(post: post),
               );
             },
+            ),
           );
         },
         loading: () => const Center(
@@ -88,11 +102,10 @@ class PostListPage extends ConsumerWidget {
             strokeWidth: 2.5,
           ),
         ),
-        error: (e, _) => Center(
-          child: Text(
-            '오류: $e',
-            style: const TextStyle(color: _DS.textSecondary),
-          ),
+        error: (e, _) => ErrorRetryView(
+          message: '공지를 불러오지 못했습니다',
+          detail: e.toString(),
+          onRetry: () => ref.invalidate(recentPostsProvider),
         ),
       ),
     );

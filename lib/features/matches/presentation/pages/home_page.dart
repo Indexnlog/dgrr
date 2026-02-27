@@ -698,12 +698,10 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     });
     try {
       await voteAttend(ref, widget.match, widget.uid!);
-      if (mounted) {
-        setState(() {
+      if (mounted) setState(() {
         _optimisticVote = null;
         _optimisticLateReason = null;
       });
-      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -724,12 +722,10 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     });
     try {
       await voteAttendLate(ref, widget.match, widget.uid!, lateTime);
-      if (mounted) {
-        setState(() {
+      if (mounted) setState(() {
         _optimisticVote = null;
         _optimisticLateReason = null;
       });
-      }
     } catch (e) {
       if (mounted) {
         setState(() {

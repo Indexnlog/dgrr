@@ -12,7 +12,12 @@
           "package_name": "com.example.dgrr_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "27853679688-sa34vegdjdh2f1g7jn1tfn8gu4e7eh25.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAcyvzPW-XST9CPc1Why-XtcOB1xz0uyDk"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "27853679688-sa34vegdjdh2f1g7jn1tfn8gu4e7eh25.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "27853679688-moninv9l2k9vuhcb0eghgqkgkb4rb7nn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.dgrrApp"
+              }
+            }
+          ]
         }
       }
     }

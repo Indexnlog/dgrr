@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../app/router/app_router.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_providers.dart';
@@ -104,7 +105,42 @@ class FcmService {
       // ignore: avoid_print
       print('[FCM] 알림 탭: ${message.data}');
     }
-    // TODO: data.payload에 따라 화면 이동 (GoRouter)
+    final data = message.data;
+    if (data.isEmpty) return;
+
+    final type = data['type'] as String?;
+    final teamId = data['teamId'] as String?;
+
+    String? path;
+    switch (type) {
+      case 'nudge':
+        path = '/my/fees';
+        break;
+      case 'court_alarm':
+        path = '/schedule/reservation-notices';
+        break;
+      case 'poll':
+        final pollId = data['pollId'] as String?;
+        if (pollId != null) path = '/schedule/polls/$pollId';
+        break;
+      case 'match':
+        final matchId = data['matchId'] as String?;
+        if (matchId != null) path = '/match/$matchId';
+        break;
+      default:
+        if (teamId != null) path = '/home';
+    }
+
+    if (path != null) {
+      try {
+        _ref.read(appRouterProvider).go(path);
+      } catch (e) {
+        if (kDebugMode) {
+          // ignore: avoid_print
+          print('[FCM] 딥링크 이동 실패: $e');
+        }
+      }
+    }
   }
 
   /// 로그인/팀 선택 후 토큰 동기화 (uid, teamId 확정 시 호출)

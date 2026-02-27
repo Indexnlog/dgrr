@@ -1,6 +1,6 @@
 import 'package:intl/intl.dart';
 
-import '../../../core/utils/korean_holidays.dart';
+import '../../../../core/utils/korean_holidays.dart';
 
 /// 월별 수업 일정 생성 (매주 목요일 + 예외 처리)
 /// - 공휴일 제외 옵션

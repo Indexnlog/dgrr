@@ -48,6 +48,11 @@ You are an expert Flutter & Firebase developer building a professional Futsal Te
 - **UI overflow 방지**: Row/Column 내 Text는 `overflow: TextOverflow.ellipsis` 또는 `Flexible`/`Expanded` 필수.
 
 ## 📝 Development Log Rules
+- **개발일지·문서 저장 위치**: `/Users/yeomhajisoo/Obsidian/Second_Brain/20_Projects_Builder/22_FRFC/`
+  - 작업일지: `작업일지/YYYY-MM-DD.md`
+  - 개발문서: `개발문서/` (03_기능_구현_상태, 06_배포_가이드, README 등)
+- dgrr_app/docs가 아닌 **Obsidian 경로**에 직접 작성/수정.
+
 If the user asks to "write a dev log", "일지 써줘", or "회고 해줘", YOU MUST follow this specific format based on the recent code changes:
 
 [Format]

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../domain/entities/reservation_notice.dart';
 import '../models/reservation_notice_model.dart';
 
 /// 예약 공지 Firestore 데이터소스

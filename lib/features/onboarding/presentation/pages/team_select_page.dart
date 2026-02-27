@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../app/providers/firebase_ready_provider.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
@@ -254,15 +255,28 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
     }
   }
 
+  Future<void> _handleEnterTeam(PublicTeam team) async {
+    await ref.read(currentTeamIdProvider.notifier).selectTeam(team.id);
+    if (mounted) {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final teamsAsync = ref.watch(publicTeamsStreamProvider);
+    final userTeamsAsync = ref.watch(userTeamsAsPublicProvider);
     final firebaseReady = ref.watch(firebaseReadyProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('팀 선택'),
         actions: [
+          TextButton.icon(
+            onPressed: () => context.push('/welcome'),
+            icon: const Icon(Icons.menu_book, size: 18),
+            label: const Text('영원FC 안내'),
+          ),
           if (kDebugMode)
             TextButton.icon(
               onPressed: _isSigningIn ? null : _handleDebugLogin,
@@ -287,51 +301,102 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
             ),
           ),
           Expanded(
-            child: teamsAsync.when(
-              data: (teams) {
-                final filtered = _searchQuery.isEmpty
-                    ? teams
-                    : teams.where((t) =>
-                        t.name.toLowerCase().contains(_searchQuery) ||
-                        t.region.toLowerCase().contains(_searchQuery) ||
-                        t.intro.toLowerCase().contains(_searchQuery)).toList();
-                return ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length + (firebaseReady ? 0 : 1),
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              if (!firebaseReady && index == 0) {
-                return _FirebaseNoticeCard(
-                  onTap: () => _showSnackBar('Firebase 설정을 완료해 주세요.'),
-                );
-              }
-
-              final teamIndex = firebaseReady ? index : index - 1;
-              final team = filtered[teamIndex];
-              final isSelected = _selectedTeamId == team.id;
-
-              return _TeamCard(
-                team: team,
-                isSelected: isSelected,
-                isSigningIn: _isSigningIn && isSelected,
-                onTap: () {
-                  setState(() {
-                    _selectedTeamId = team.id;
-                  });
-                },
-                onJoin: isSelected && !_isSigningIn
-                    ? () => _handleJoin(team)
-                    : null,
-              );
-            },
-          );
-              },
-              loading: () => const Center(
-                child: CircularProgressIndicator(),
-              ),
-              error: (_, __) => const Center(
-                child: Text('팀 목록을 불러오는 중 문제가 발생했습니다.'),
-              ),
+            child: CustomScrollView(
+              slivers: [
+                if (!firebaseReady)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: _FirebaseNoticeCard(
+                        onTap: () => _showSnackBar('Firebase 설정을 완료해 주세요.'),
+                      ),
+                    ),
+                  ),
+                userTeamsAsync.when(
+                  data: (myTeams) {
+                    if (myTeams.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+                    return SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          Text(
+                            '내가 속한 팀',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          ...myTeams.map((team) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _TeamCard(
+                                  team: team,
+                                  isSelected: _selectedTeamId == team.id,
+                                  isSigningIn: false,
+                                  onTap: () => setState(() => _selectedTeamId = team.id),
+                                  onEnter: () => _handleEnterTeam(team),
+                                ),
+                              )),
+                          const SizedBox(height: 16),
+                        ]),
+                      ),
+                    );
+                  },
+                  loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                  error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                ),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: Text(
+                      '참여 가능한 팀',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ),
+                teamsAsync.when(
+                  data: (teams) {
+                    final filtered = _searchQuery.isEmpty
+                        ? teams
+                        : teams.where((t) =>
+                            t.name.toLowerCase().contains(_searchQuery) ||
+                            t.region.toLowerCase().contains(_searchQuery) ||
+                            t.intro.toLowerCase().contains(_searchQuery)).toList();
+                    return SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final team = filtered[index];
+                          final isSelected = _selectedTeamId == team.id;
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            child: _TeamCard(
+                              team: team,
+                              isSelected: isSelected,
+                              isSigningIn: _isSigningIn && isSelected,
+                              onTap: () => setState(() => _selectedTeamId = team.id),
+                              onJoin: isSelected && !_isSigningIn
+                                  ? () => _handleJoin(team)
+                                  : null,
+                            ),
+                          );
+                        },
+                        childCount: filtered.length,
+                      ),
+                    );
+                  },
+                  loading: () => const SliverFillRemaining(
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (_, __) => const SliverFillRemaining(
+                    child: Center(
+                      child: Text('팀 목록을 불러오는 중 문제가 발생했습니다.'),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -384,7 +449,8 @@ class _TeamCard extends StatelessWidget {
     required this.isSelected,
     required this.isSigningIn,
     required this.onTap,
-    required this.onJoin,
+    this.onJoin,
+    this.onEnter,
   });
 
   final PublicTeam team;
@@ -392,6 +458,7 @@ class _TeamCard extends StatelessWidget {
   final bool isSigningIn;
   final VoidCallback onTap;
   final VoidCallback? onJoin;
+  final VoidCallback? onEnter;
 
   @override
   Widget build(BuildContext context) {
@@ -442,19 +509,20 @@ class _TeamCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton(
-                  onPressed: onJoin,
-                  child: isSigningIn
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('참여하기'),
+              if (onEnter != null || onJoin != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: onEnter ?? (isSigningIn ? null : onJoin),
+                    child: isSigningIn && onJoin != null
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(onEnter != null ? '들어가기' : '참여하기'),
+                  ),
                 ),
-              ),
             ],
           ),
         ),

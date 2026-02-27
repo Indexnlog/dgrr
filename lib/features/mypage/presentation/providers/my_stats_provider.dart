@@ -14,11 +14,11 @@ String formatTenure(DateTime? joinedAt) {
   final now = DateTime.now();
   final diff = now.difference(joinedAt);
   final days = diff.inDays;
-  if (days < 30) return '$days일째';
+  if (days < 30) return '${days}일째';
   final months = (days / 30).floor();
-  if (months < 12) return '$months개월째';
+  if (months < 12) return '${months}개월째';
   final years = (months / 12).floor();
-  return '$years년째';
+  return '${years}년째';
 }
 
 /// 최근 완료된 경기 목록

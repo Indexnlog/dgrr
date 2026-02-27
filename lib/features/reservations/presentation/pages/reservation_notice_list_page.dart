@@ -59,8 +59,14 @@ class ReservationNoticeListPage extends ConsumerWidget {
       body: noticesAsync.when(
         data: (notices) {
           if (notices.isEmpty) {
-            return Center(
-              child: Column(
+            return RefreshIndicator(
+              onRefresh: () async => ref.invalidate(upcomingReservationNoticesProvider),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height - 200,
+                  child: Center(
+                    child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.sports_soccer, color: _DS.textMuted, size: 48),
@@ -75,10 +81,16 @@ class ReservationNoticeListPage extends ConsumerWidget {
                     style: TextStyle(color: _DS.textMuted, fontSize: 13),
                   ),
                 ],
+                    ),
+                  ),
+                ),
               ),
             );
           }
-          return ListView.builder(
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(upcomingReservationNoticesProvider),
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
             itemCount: notices.length,
             itemBuilder: (context, index) {
@@ -88,6 +100,7 @@ class ReservationNoticeListPage extends ConsumerWidget {
                 child: _NoticeCard(notice: notice),
               );
             },
+            ),
           );
         },
         loading: () => const Center(

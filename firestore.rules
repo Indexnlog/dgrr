@@ -2,10 +2,117 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 에뮬레이터 개발 중: 전체 읽기/쓰기 허용
-    // 운영 배포 전 반드시 팀별 격리 규칙으로 교체할 것
-    match /{document=**} {
-      allow read, write: if true;
+    // 팀 검색용 공개 정보 (온보딩) - 누구나 읽기 가능
+    match /teams_public/{teamId} {
+      allow read: if true;
+      allow write: if false;
     }
+
+    // 팀 운영 데이터 - 해당 팀 멤버( pending 포함 )만 접근
+    match /teams/{teamId} {
+      allow read: if request.auth != null
+        && exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid));
+      allow create: if false;  // 팀 생성은 어드민/Cloud Function
+      allow update, delete: if request.auth != null
+        && isActiveMember(teamId);
+
+      // 서브컬렉션: active 멤버만 읽기/쓰기 (members 제외)
+      match /members/{memberId} {
+        // 가입 신청: 본인만 pending 문서 생성 가능
+        allow create: if request.auth != null
+          && request.auth.uid == memberId
+          && request.resource.data.status == 'pending';
+        // 본인 문서 읽기, 또는 active 멤버가 전체 목록 읽기
+        allow read: if request.auth != null
+          && (memberId == request.auth.uid || isActiveMember(teamId));
+        // 본인: 프로필 수정, rejected→pending 재신청, active→left 탈퇴 / 운영진: 승인·거절
+        allow update: if request.auth != null
+          && (
+            (memberId == request.auth.uid && (
+              request.resource.data.status == resource.data.status
+              || (resource.data.status == 'rejected' && request.resource.data.status == 'pending')
+              || (resource.data.status == 'active' && request.resource.data.status == 'left')
+            ))
+            || canApproveMembers(teamId)
+          );
+        allow delete: if false;
+      }
+
+      match /opponents/{opponentId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /matches/{matchId} {
+        allow read, write: if isActiveMember(teamId);
+        match /rounds/{roundId} {
+          allow read, write: if isActiveMember(teamId);
+          match /records/{recordId} {
+            allow read, write: if isActiveMember(teamId);
+          }
+        }
+      }
+
+      match /events/{eventId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /grounds/{groundId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /match_media/{mediaId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /feedbacks/{feedbackId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /fees/{feeId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /polls/{pollId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /posts/{postId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /registrations/{regId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /reservations/{resId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /reservation_notices/{noticeId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /notifications/{notifId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /settings/{settingId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+
+      match /transactions/{txId} {
+        allow read, write: if isActiveMember(teamId);
+      }
+    }
+  }
+
+  function isActiveMember(teamId) {
+    return request.auth != null
+      && get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.status == 'active';
+  }
+
+  function canApproveMembers(teamId) {
+    let role = get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role;
+    return isActiveMember(teamId) && role in ['admin', '운영진', '총무', 'treasurer', 'coach'];
   }
 }

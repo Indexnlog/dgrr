@@ -195,12 +195,10 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
           }
         }
       }
-      if (mounted) {
-        setState(() {
+      if (mounted) setState(() {
         _optimisticVotes.clear();
         _optimisticUnvotes.clear();
       });
-      }
     } catch (e) {
       if (mounted) {
         setState(() {

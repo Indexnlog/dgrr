@@ -4,7 +4,7 @@ import '../theme/app_theme.dart';
 
 /// 카드 스켈레톤 (로딩 시 CircularProgressIndicator 대체)
 class CardSkeleton extends StatelessWidget {
-  const CardSkeleton({super.key, 
+  const CardSkeleton({
     this.height = 120,
     this.borderRadius = 16,
   });

@@ -19,4 +19,10 @@ abstract class TeamRepository {
     required String memberId,
     required String? fcmToken,
   });
+
+  /// 팀 탈퇴 (status: 'left')
+  Future<void> leaveTeam({
+    required String teamId,
+    required String memberId,
+  });
 }

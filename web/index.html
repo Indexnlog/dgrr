@@ -31,6 +31,15 @@
 
   <title>dgrr_app</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Google Sign-In Web: OAuth 2.0 Web Client ID (필수)
+    1. https://console.cloud.google.com/apis/credentials?project=dgrr-app 접속
+    2. "OAuth 2.0 클라이언트 ID" → "웹 애플리케이션" 타입 확인/생성
+    3. "승인된 JavaScript 원본"에 http://localhost 추가
+    4. 클라이언트 ID 복사 후 아래 content에 붙여넣기 (xxx.apps.googleusercontent.com)
+  -->
+  <meta name="google-signin-client_id" content="YOUR_WEB_CLIENT_ID.apps.googleusercontent.com">
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
