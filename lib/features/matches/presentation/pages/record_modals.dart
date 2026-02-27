@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/errors/errors.dart';
 import '../../../teams/domain/entities/member.dart';
 import '../../data/datasources/round_record_data_source.dart';
 import '../../domain/entities/record.dart';
@@ -214,9 +215,7 @@ class _GoalRecordSheetState extends State<_GoalRecordSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: $e')),
-        );
+        ErrorHandler.showError(context, e, fallback: '저장에 실패했습니다');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -334,7 +333,7 @@ class _SubstitutionRecordSheetState extends State<_SubstitutionRecordSheet> {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: _C.blue.withOpacity(0.12),
+                color: _C.blue.withValues(alpha:0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.swap_vert, color: _C.blue, size: 20),
@@ -398,9 +397,7 @@ class _SubstitutionRecordSheetState extends State<_SubstitutionRecordSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: $e')),
-        );
+        ErrorHandler.showError(context, e, fallback: '저장에 실패했습니다');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -439,7 +436,7 @@ class _ChoiceChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? _C.green.withOpacity(0.15) : _C.surface,
+          color: selected ? _C.green.withValues(alpha:0.15) : _C.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? _C.green : _C.divider,
@@ -487,7 +484,7 @@ Future<void> showQuickGoalSheet({
   );
 }
 
-class _QuickGoalSheet extends StatelessWidget {
+class _QuickGoalSheet extends StatefulWidget {
   const _QuickGoalSheet({
     required this.teamId,
     required this.matchId,
@@ -505,7 +502,24 @@ class _QuickGoalSheet extends StatelessWidget {
   final String? createdBy;
 
   @override
+  State<_QuickGoalSheet> createState() => _QuickGoalSheetState();
+}
+
+class _QuickGoalSheetState extends State<_QuickGoalSheet> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final filtered = _filterMembers(widget.members, _query);
+    final showSearch = widget.members.length > 8;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 20, right: 20, top: 16,
@@ -534,15 +548,38 @@ class _QuickGoalSheet extends StatelessWidget {
             '우리 팀 골',
             style: TextStyle(color: _C.sub, fontSize: 12),
           ),
+          if (showSearch) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _query = v.trim()),
+              style: const TextStyle(color: _C.text),
+              decoration: InputDecoration(
+                hintText: '이름, 등번호로 검색',
+                hintStyle: const TextStyle(color: _C.muted),
+                prefixIcon: const Icon(Icons.search, color: _C.muted, size: 20),
+                filled: true,
+                fillColor: _C.surface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                isDense: true,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: members.map((m) => _PlayerChip(
+            children: filtered.map((m) => _PlayerChip(
               member: m,
               onTap: () => _recordGoal(context, m),
             )).toList(),
           ),
+          if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text('검색 결과 없음', style: TextStyle(color: _C.muted, fontSize: 13)),
+            ),
           const SizedBox(height: 24),
         ],
       ),
@@ -551,16 +588,16 @@ class _QuickGoalSheet extends StatelessWidget {
 
   Future<void> _recordGoal(BuildContext context, Member scorer) async {
     try {
-      await dataSource.addGoalRecord(
-        teamId: teamId,
-        matchId: matchId,
-        roundId: roundId,
+      await widget.dataSource.addGoalRecord(
+        teamId: widget.teamId,
+        matchId: widget.matchId,
+        roundId: widget.roundId,
         teamType: TeamType.our,
-        timeOffset: elapsedSeconds,
+        timeOffset: widget.elapsedSeconds,
         playerId: scorer.memberId,
         playerName: scorer.uniformName ?? scorer.name,
         playerNumber: scorer.number,
-        createdBy: createdBy,
+        createdBy: widget.createdBy,
       );
       if (context.mounted) {
         Navigator.pop(context);
@@ -570,9 +607,7 @@ class _QuickGoalSheet extends StatelessWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: $e')),
-        );
+        ErrorHandler.showError(context, e, fallback: '저장에 실패했습니다');
       }
     }
   }
@@ -635,9 +670,21 @@ class _QuickSubstitutionSheet extends StatefulWidget {
 class _QuickSubstitutionSheetState extends State<_QuickSubstitutionSheet> {
   Member? _outPlayer;
   Member? _inPlayer;
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final filteredOut = _filterMembers(widget.fieldMembers, _query);
+    final filteredIn = _filterMembers(widget.benchMembers, _query);
+    final showSearch = widget.fieldMembers.length + widget.benchMembers.length > 10;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 20, right: 20, top: 16,
@@ -661,13 +708,31 @@ class _QuickSubstitutionSheetState extends State<_QuickSubstitutionSheet> {
               Text('교체 빠른 기록', style: TextStyle(color: _C.text, fontSize: 18, fontWeight: FontWeight.w700)),
             ],
           ),
+          if (showSearch) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _query = v.trim()),
+              style: const TextStyle(color: _C.text),
+              decoration: InputDecoration(
+                hintText: '이름, 등번호로 검색',
+                hintStyle: const TextStyle(color: _C.muted),
+                prefixIcon: const Icon(Icons.search, color: _C.muted, size: 20),
+                filled: true,
+                fillColor: _C.surface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                isDense: true,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           const Text('OUT (나가는 선수)', style: TextStyle(color: _C.sub, fontSize: 12, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: widget.fieldMembers.map((m) => _PlayerChip(
+            children: filteredOut.map((m) => _PlayerChip(
               member: m,
               selected: _outPlayer?.memberId == m.memberId,
               onTap: () => setState(() => _outPlayer = _outPlayer?.memberId == m.memberId ? null : m),
@@ -679,7 +744,7 @@ class _QuickSubstitutionSheetState extends State<_QuickSubstitutionSheet> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: widget.benchMembers.map((m) => _PlayerChip(
+            children: filteredIn.map((m) => _PlayerChip(
               member: m,
               selected: _inPlayer?.memberId == m.memberId,
               onTap: () => setState(() => _inPlayer = _inPlayer?.memberId == m.memberId ? null : m),
@@ -728,9 +793,7 @@ class _QuickSubstitutionSheetState extends State<_QuickSubstitutionSheet> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: $e')),
-        );
+        ErrorHandler.showError(context, e, fallback: '저장에 실패했습니다');
       }
     }
   }
@@ -749,7 +812,7 @@ class _PlayerChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? _C.blue.withOpacity(0.2) : _C.surface,
+          color: selected ? _C.blue.withValues(alpha:0.2) : _C.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? _C.blue : _C.divider,
@@ -768,6 +831,18 @@ class _PlayerChip extends StatelessWidget {
   }
 }
 
+/// 멤버 검색 필터 (이름, 등번호, 유니폼명)
+List<Member> _filterMembers(List<Member> members, String query) {
+  if (query.isEmpty) return members;
+  final q = query.trim().toLowerCase();
+  return members.where((m) {
+    final name = m.name.toLowerCase();
+    final uniform = (m.uniformName ?? '').toLowerCase();
+    final numStr = m.number?.toString() ?? '';
+    return name.contains(q) || uniform.contains(q) || numStr.contains(q);
+  }).toList();
+}
+
 class _PlayerDropdown extends StatelessWidget {
   const _PlayerDropdown({
     required this.members,
@@ -783,42 +858,151 @@ class _PlayerDropdown extends StatelessWidget {
   final ValueChanged<Member?> onChanged;
   final bool allowNone;
 
+  void _openPicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: _C.card,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _MemberPickerSheet(
+        members: members,
+        selected: selected,
+        hint: hint,
+        allowNone: allowNone,
+        onSelect: (m) {
+          onChanged(m);
+          Navigator.pop(ctx);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: _C.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _C.divider),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          isExpanded: true,
-          value: selected?.memberId,
-          hint: Text(hint, style: const TextStyle(color: _C.muted, fontSize: 14)),
-          dropdownColor: _C.card,
-          style: const TextStyle(color: _C.text, fontSize: 14),
-          items: [
-            if (allowNone)
-              const DropdownMenuItem(value: '__none__', child: Text('없음', style: TextStyle(color: _C.muted))),
-            ...members.map((m) => DropdownMenuItem(
-              value: m.memberId,
-              child: Text(
-                '${m.number != null ? '#${m.number} ' : ''}${m.uniformName ?? m.name}',
-                style: const TextStyle(color: _C.text),
-              ),
-            )),
-          ],
-          onChanged: (id) {
-            if (id == '__none__') {
-              onChanged(null);
-            } else {
-              final member = members.where((m) => m.memberId == id).firstOrNull;
-              onChanged(member);
-            }
-          },
+    final showSearch = members.length > 6;
+    return GestureDetector(
+      onTap: () => _openPicker(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: _C.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _C.divider),
         ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                selected != null
+                    ? '${selected!.number != null ? '#${selected!.number} ' : ''}${selected!.uniformName ?? selected!.name}'
+                    : hint,
+                style: TextStyle(
+                  color: selected != null ? _C.text : _C.muted,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            if (showSearch)
+              Icon(Icons.search, size: 18, color: _C.muted),
+            Icon(Icons.arrow_drop_down, color: _C.muted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MemberPickerSheet extends StatefulWidget {
+  const _MemberPickerSheet({
+    required this.members,
+    required this.selected,
+    required this.hint,
+    required this.allowNone,
+    required this.onSelect,
+  });
+  final List<Member> members;
+  final Member? selected;
+  final String hint;
+  final bool allowNone;
+  final ValueChanged<Member?> onSelect;
+
+  @override
+  State<_MemberPickerSheet> createState() => _MemberPickerSheetState();
+}
+
+class _MemberPickerSheetState extends State<_MemberPickerSheet> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filterMembers(widget.members, _query);
+    final showSearch = widget.members.length > 6;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 12),
+          if (showSearch) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _query = v.trim()),
+                style: const TextStyle(color: _C.text),
+                decoration: InputDecoration(
+                  hintText: '이름, 등번호로 검색',
+                  hintStyle: const TextStyle(color: _C.muted),
+                  prefixIcon: const Icon(Icons.search, color: _C.muted, size: 20),
+                  filled: true,
+                  fillColor: _C.surface,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  if (widget.allowNone)
+                    ListTile(
+                      title: const Text('없음', style: TextStyle(color: _C.muted)),
+                      onTap: () => widget.onSelect(null),
+                    ),
+                  ...filtered.map((m) => ListTile(
+                    title: Text(
+                      '${m.number != null ? '#${m.number} ' : ''}${m.uniformName ?? m.name}',
+                      style: const TextStyle(color: _C.text),
+                    ),
+                    onTap: () => widget.onSelect(m),
+                  )),
+                  if (filtered.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: Text('검색 결과 없음', style: TextStyle(color: _C.muted))),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

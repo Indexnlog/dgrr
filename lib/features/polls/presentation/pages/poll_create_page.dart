@@ -9,6 +9,7 @@ import '../../../../core/permissions/permission_checker.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../data/models/poll_model.dart';
 import '../../domain/entities/poll.dart';
+import '../../../events/domain/services/class_schedule_generator.dart';
 import '../../domain/services/poll_creation_service.dart';
 import '../providers/poll_providers.dart';
 
@@ -40,6 +41,8 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
   PollCategory _category = PollCategory.membership;
   String _targetMonth = PollCreationService.nextMonth();
   bool _isCreating = false;
+  bool _excludeHolidays = true;
+  bool _includeFifthWeek = true;
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +96,8 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
           if (_category == PollCategory.attendance) ...[
             const SizedBox(height: 24),
             _buildSectionTitle('수업 일정'),
+            const SizedBox(height: 8),
+            _buildScheduleOptions(),
             const SizedBox(height: 8),
             _buildClassDatesInfo(classesAsync),
           ],
@@ -184,7 +189,7 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: isSelected ? _DS.gold.withOpacity(0.15) : _DS.bgCard,
+              color: isSelected ? _DS.gold.withValues(alpha:0.15) : _DS.bgCard,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: isSelected ? _DS.gold : _DS.divider,
@@ -204,6 +209,59 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
     );
   }
 
+  Widget _buildScheduleOptions() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _DS.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _DS.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '매주 목요일 기준, 아래 옵션 적용',
+            style: TextStyle(color: _DS.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: Checkbox(
+                  value: _excludeHolidays,
+                  onChanged: (v) => setState(() => _excludeHolidays = v ?? true),
+                  activeColor: _DS.attendGreen,
+                  fillColor: WidgetStateProperty.resolveWith((_) => _DS.textMuted),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text('공휴일 제외', style: TextStyle(color: _DS.textPrimary, fontSize: 13)),
+            ],
+          ),
+          Row(
+            children: [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: Checkbox(
+                  value: _includeFifthWeek,
+                  onChanged: (v) => setState(() => _includeFifthWeek = v ?? true),
+                  activeColor: _DS.attendGreen,
+                  fillColor: WidgetStateProperty.resolveWith((_) => _DS.textMuted),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text('5번째 목요일 포함', style: TextStyle(color: _DS.textPrimary, fontSize: 13)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildClassDatesInfo(AsyncValue classesAsync) {
     final monthParts = _targetMonth.split('-');
     final year = int.tryParse(monthParts[0]) ?? DateTime.now().year;
@@ -211,9 +269,6 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
 
     return classesAsync.when(
       data: (classes) {
-        final start = DateTime(year, month, 1);
-        final end = DateTime(year, month + 1, 0);
-
         final inRange = classes
             .where((e) {
               final d = e.date;
@@ -226,7 +281,20 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
             .toList()
           ..sort();
 
+        List<String> displayDates = inRange;
+        String sourceLabel = '기존 수업 일정';
         if (inRange.isEmpty) {
+          final generated = ClassScheduleGenerator.generate(
+            year: year,
+            month: month,
+            excludeHolidays: _excludeHolidays,
+            includeFifthWeek: _includeFifthWeek,
+          );
+          displayDates = ClassScheduleGenerator.toDateStrings(generated);
+          sourceLabel = '자동 생성 (목요일 기준)';
+        }
+
+        if (displayDates.isEmpty) {
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -235,7 +303,7 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
               border: Border.all(color: _DS.divider),
             ),
             child: Text(
-              '해당 월 수업 일정이 없습니다. 일정을 먼저 등록해 주세요.',
+              '해당 월 수업 일정 후보가 없습니다. 5번째 주 포함을 켜 보세요.',
               style: TextStyle(color: _DS.textMuted, fontSize: 13),
             ),
           );
@@ -252,7 +320,7 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${inRange.length}개 수업 일정이 투표 옵션으로 포함됩니다.',
+                '${displayDates.length}개 수업 일정이 투표 옵션으로 포함됩니다. ($sourceLabel)',
                 style: const TextStyle(
                   color: _DS.textPrimary,
                   fontSize: 14,
@@ -263,7 +331,7 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: inRange.map((d) {
+                children: displayDates.map((d) {
                   final dt = DateTime.tryParse(d);
                   final label =
                       dt != null ? DateFormat('M/d (E)', 'ko_KR').format(dt) : d;
@@ -297,7 +365,7 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _DS.surface.withOpacity(0.5),
+        color: _DS.surface.withValues(alpha:0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _DS.divider),
       ),
@@ -341,7 +409,7 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
           createdBy: uid,
         );
       } else {
-        final classDates = classesAsync.value
+        var classDates = classesAsync.value
                 ?.where((e) {
                   final d = e.date;
                   if (d == null) return false;
@@ -355,17 +423,31 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
                 .map((e) => e.date!)
                 .toList() ??
             [];
-        classDates.sort();
+
+        if (classDates.isEmpty) {
+          final parts = _targetMonth.split('-');
+          final y = int.tryParse(parts[0]) ?? DateTime.now().year;
+          final m = int.tryParse(parts[1]) ?? DateTime.now().month;
+          final generated = ClassScheduleGenerator.generate(
+            year: y,
+            month: m,
+            excludeHolidays: _excludeHolidays,
+            includeFifthWeek: _includeFifthWeek,
+          );
+          classDates = ClassScheduleGenerator.toDateStrings(generated);
+        }
 
         if (classDates.isEmpty) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                  content: Text('해당 월 수업 일정이 없습니다. 먼저 등록해 주세요.')),
+                  content: Text('해당 월 수업 일정 후보가 없습니다. 옵션을 조정해 주세요.')),
             );
           }
           return;
         }
+
+        classDates.sort();
 
         poll = PollCreationService.createAttendancePoll(
           targetMonth: _targetMonth,
@@ -415,7 +497,7 @@ class _CategoryChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
-            color: isSelected ? _DS.gold.withOpacity(0.12) : _DS.surface,
+            color: isSelected ? _DS.gold.withValues(alpha:0.12) : _DS.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isSelected ? _DS.gold : Colors.transparent,

@@ -107,7 +107,7 @@ class EventRemoteDataSource {
       int absent = 0;
       for (final a in attendees) {
         final s = a['status'] as String?;
-        if (s == 'attending' || s == 'late') {
+        if (s == 'attending' || s == 'late' || s == 'attended') {
           present++;
         } else if (s == 'absent') {
           absent++;
@@ -123,10 +123,45 @@ class EventRemoteDataSource {
   }
 
   /// 수업 종료 (출석 확정)
+  /// 참석 투표 = 출석: attending/late → attended 자동 전환
   Future<void> finishClass(String teamId, String eventId) async {
-    await _eventsRef(teamId).doc(eventId).update({
-      'status': 'finished',
-      'updatedAt': FieldValue.serverTimestamp(),
+    final ref = _eventsRef(teamId).doc(eventId);
+
+    await firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw Exception('수업 문서가 존재하지 않습니다');
+      final data = snap.data()!;
+
+      final attendees =
+          (data['attendees'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+
+      // attending, late → attended 자동 전환
+      for (final a in attendees) {
+        final s = a['status'] as String?;
+        if (s == 'attending' || s == 'late') {
+          a['status'] = 'attended';
+          a['updatedAt'] = FieldValue.serverTimestamp();
+        }
+      }
+
+      // 출석 요약: attended = 출석 확정
+      int present = 0;
+      int absent = 0;
+      for (final a in attendees) {
+        final s = a['status'] as String?;
+        if (s == 'attended' || s == 'attending' || s == 'late') {
+          present++;
+        } else if (s == 'absent') {
+          absent++;
+        }
+      }
+
+      tx.update(ref, {
+        'status': 'finished',
+        'attendees': attendees,
+        'attendance': {'present': present, 'absent': absent},
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     });
   }
 

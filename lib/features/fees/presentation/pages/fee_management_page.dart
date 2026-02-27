@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../registrations/data/models/registration_model.dart';
 import '../../../registrations/domain/entities/registration.dart';
 import '../../../registrations/presentation/providers/registration_providers.dart';
+import '../../../teams/domain/entities/member.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_members_provider.dart';
+import '../../../teams/presentation/providers/user_role_provider.dart';
 import '../../domain/entities/fee.dart';
 import '../providers/fee_providers.dart';
+import '../widgets/fee_create_sheet.dart';
 
 class _DS {
   _DS._();
@@ -38,28 +41,42 @@ class FeeManagementPage extends ConsumerWidget {
         title: const Text('회비 관리',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
         elevation: 0,
+        actions: [
+          if (ref.watch(hasPermissionProvider(Permission.treasurer)))
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () => showFeeCreateSheet(context),
+            ),
+        ],
       ),
       body: feesAsync.when(
         data: (fees) {
-          if (fees.isEmpty) {
-            return Center(
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              _CurrentMonthRegistrationCard(),
+              if (fees.isEmpty) ...[
+                const SizedBox(height: 20),
+                Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.account_balance_wallet_outlined,
-                      size: 48, color: _DS.textMuted.withOpacity(0.4)),
+                      size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
                   const SizedBox(height: 12),
                   Text('회비 설정이 없습니다',
                       style: TextStyle(color: _DS.textMuted, fontSize: 14)),
                 ],
               ),
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.all(20),
-            itemCount: fees.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (_, index) => _FeeCard(fee: fees[index]),
+            ),
+          ] else ...[
+                const SizedBox(height: 12),
+                ...fees.map((f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _FeeCard(fee: f),
+                )),
+              ],
+            ],
           );
         },
         loading: () => const Center(
@@ -68,6 +85,81 @@ class FeeManagementPage extends ConsumerWidget {
         error: (e, _) => Center(
             child: Text('오류: $e',
                 style: const TextStyle(color: _DS.textSecondary))),
+      ),
+    );
+  }
+}
+
+/// 이번 달 월간 등록 현황 (총무 결제 확인용)
+class _CurrentMonthRegistrationCard extends ConsumerWidget {
+  const _CurrentMonthRegistrationCard();
+
+  static String _formatSeason(String id) {
+    final parts = id.split('-');
+    if (parts.length == 2) {
+      return '${parts[0]}년 ${int.tryParse(parts[1]) ?? parts[1]}월';
+    }
+    return id;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final regsAsync = ref.watch(currentMonthRegistrationsProvider);
+    final memberMap = ref.watch(memberMapProvider);
+    final teamId = ref.watch(currentTeamIdProvider) ?? '';
+    final seasonLabel = _formatSeason(currentSeasonId);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _DS.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _DS.attendGreen.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _DS.attendGreen.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('이번 달',
+                    style: TextStyle(
+                        color: _DS.attendGreen,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(width: 8),
+              Text(seasonLabel,
+                  style: const TextStyle(
+                      color: _DS.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          regsAsync.when(
+            data: (regs) => _PaymentStatus(
+              registrations: regs,
+              memberMap: memberMap,
+              teamId: teamId,
+              feeId: currentSeasonId,
+              ref: ref,
+            ),
+            loading: () => const SizedBox(
+              height: 24,
+              child: Center(
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: _DS.textMuted),
+              ),
+            ),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ],
       ),
     );
   }
@@ -99,7 +191,7 @@ class _FeeCard extends ConsumerWidget {
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: fee.isActive == true
-                      ? _DS.attendGreen.withOpacity(0.15)
+                      ? _DS.attendGreen.withValues(alpha:0.15)
                       : _DS.surface,
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -155,6 +247,47 @@ class _FeeCard extends ConsumerWidget {
   }
 }
 
+void _showUnpaidListDialog(
+  BuildContext context,
+  List<RegistrationModel> unpaid,
+) {
+  if (unpaid.isEmpty) return;
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: _DS.bgCard,
+      title: Text(
+        '미납자 목록 (${unpaid.length}명)',
+        style: const TextStyle(color: _DS.textPrimary, fontSize: 18),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: unpaid
+              .map((r) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      r.userName ?? '알 수 없음',
+                      style: const TextStyle(
+                        color: _DS.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('닫기', style: TextStyle(color: _DS.gold)),
+        ),
+      ],
+    ),
+  );
+}
+
 class _PaymentStatus extends StatelessWidget {
   const _PaymentStatus({
     required this.registrations,
@@ -165,7 +298,7 @@ class _PaymentStatus extends StatelessWidget {
   });
 
   final List<RegistrationModel> registrations;
-  final Map<String, dynamic> memberMap;
+  final Map<String, Member> memberMap;
   final String teamId;
   final String feeId;
   final WidgetRef ref;
@@ -193,13 +326,12 @@ class _PaymentStatus extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 12),
                 child: GestureDetector(
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          '미납자 Nudge: FCM 연동 후 푸시 알림으로 안내됩니다',
-                        ),
-                      ),
-                    );
+                    final unpaid = registrations
+                        .where((r) => r.status != RegistrationStatus.paid)
+                        .toList();
+                    _showUnpaidListDialog(context, unpaid);
+                    // TODO: Cloud Function sendNudgeToUnpaid 연동 시 푸시 발송
+                    // docs/FCM_NUDGE_연동가이드.md 참고
                   },
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -253,12 +385,12 @@ class _PaymentStatus extends StatelessWidget {
                     horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: isPaid
-                      ? _DS.attendGreen.withOpacity(0.1)
+                      ? _DS.attendGreen.withValues(alpha:0.1)
                       : _DS.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                       color: isPaid
-                          ? _DS.attendGreen.withOpacity(0.3)
+                          ? _DS.attendGreen.withValues(alpha:0.3)
                           : _DS.divider),
                 ),
                 child: Row(

@@ -50,6 +50,7 @@ class MatchModel extends Match {
     super.attendees,
     super.absentees,
     super.absenceReasons,
+    super.ballBringers,
     super.lineup,
     super.lineupSize,
     super.captainId,
@@ -100,6 +101,9 @@ class MatchModel extends Match {
       absenceReasons: json['absenceReasons'] != null
           ? Map<String, dynamic>.from(json['absenceReasons'] as Map)
           : null,
+      ballBringers: json['ballBringers'] != null
+          ? List<String>.from(json['ballBringers'] as List)
+          : null,
       lineup: json['lineup'] != null
           ? List<String>.from(json['lineup'] as List)
           : null,
@@ -146,6 +150,7 @@ class MatchModel extends Match {
       'attendees': attendees ?? [],
       'absentees': absentees ?? [],
       if (absenceReasons != null) 'absenceReasons': absenceReasons,
+      if (ballBringers != null) 'ballBringers': ballBringers,
       if (createdBy != null) 'createdBy': createdBy,
       if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
       'updatedAt': FieldValue.serverTimestamp(),

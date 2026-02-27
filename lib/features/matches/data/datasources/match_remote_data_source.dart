@@ -224,6 +224,33 @@ class MatchRemoteDataSource {
     });
   }
 
+  /// 공 가져가기 자원 토글 ("저도 들고가요" 방식)
+  Future<void> toggleBallBringer(
+    String teamId,
+    String matchId,
+    String uid,
+  ) async {
+    final ref = _matchesRef(teamId).doc(matchId);
+
+    await firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) throw Exception('경기 문서가 존재하지 않습니다');
+      final data = snap.data()!;
+
+      final list = List<String>.from(data['ballBringers'] ?? []);
+      if (list.contains(uid)) {
+        list.remove(uid);
+      } else {
+        list.add(uid);
+      }
+
+      tx.update(ref, {
+        'ballBringers': list,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
   /// participants를 attendees와 동기화 (경기 시작 시)
   Future<void> syncParticipantsFromAttendees(
     String teamId,
@@ -255,7 +282,7 @@ class MatchRemoteDataSource {
       'lineup': lineup,
       if (lineupSize != null) 'lineupSize': lineupSize,
       if (captainId != null) 'captainId': captainId,
-      if (lineupAnnouncedAt != null) 'lineupAnnouncedAt': Timestamp.fromDate(lineupAnnouncedAt!),
+      if (lineupAnnouncedAt != null) 'lineupAnnouncedAt': Timestamp.fromDate(lineupAnnouncedAt),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -270,10 +297,12 @@ class MatchRemoteDataSource {
     required String opponentName,
     String? opponentContact,
     String opponentStatus = 'seeking',
+    String? opponentId,
     int minPlayers = 7,
     String? createdBy,
   }) async {
     final opponent = OpponentInfoModel(
+      teamId: opponentId,
       name: opponentName,
       contact: opponentContact,
       status: opponentStatus,

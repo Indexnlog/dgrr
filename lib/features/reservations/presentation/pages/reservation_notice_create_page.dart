@@ -231,7 +231,7 @@ class _ReservationNoticeCreatePageState
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? _DS.classBlue.withOpacity(0.15)
+                          ? _DS.classBlue.withValues(alpha:0.15)
                           : _DS.bgCard,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
@@ -340,7 +340,7 @@ class _ReservationNoticeCreatePageState
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? _DS.gold.withOpacity(0.15)
+                          ? _DS.gold.withValues(alpha:0.15)
                           : _DS.bgCard,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
@@ -629,7 +629,7 @@ class _TypeChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? _DS.teamRed.withOpacity(0.2) : _DS.bgCard,
+          color: isSelected ? _DS.teamRed.withValues(alpha:0.2) : _DS.bgCard,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? _DS.teamRed : _DS.divider,

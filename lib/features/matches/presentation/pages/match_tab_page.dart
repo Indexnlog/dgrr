@@ -7,11 +7,25 @@ import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/match.dart';
 import '../providers/match_providers.dart';
 
-class MatchTabPage extends ConsumerWidget {
+class MatchTabPage extends ConsumerStatefulWidget {
   const MatchTabPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MatchTabPage> createState() => _MatchTabPageState();
+}
+
+class _MatchTabPageState extends ConsumerState<MatchTabPage> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final matchesAsync = ref.watch(upcomingMatchesProvider);
 
     return Scaffold(
@@ -21,28 +35,64 @@ class MatchTabPage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-              child: Text(
-                '매치',
-                style: const TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Row(
+                children: [
+                  const Text(
+                    '매치',
+                    style: TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => context.push('/match/opponents'),
+                    child: Text(
+                      '상대팀',
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+                decoration: InputDecoration(
+                  hintText: '상대팀명으로 검색',
+                  hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                  prefixIcon: Icon(Icons.search, color: AppTheme.textMuted, size: 20),
+                  filled: true,
+                  fillColor: AppTheme.bgCard,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  isDense: true,
                 ),
               ),
             ),
             Expanded(
               child: matchesAsync.when(
                 data: (matches) {
-                  if (matches.isEmpty) {
+                  final filtered = _searchQuery.isEmpty
+                      ? matches
+                      : matches.where((m) =>
+                          (m.opponentName ?? '').toLowerCase().contains(_searchQuery)).toList();
+                  if (filtered.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(PhosphorIconsRegular.soccerBall, size: 56, color: AppTheme.textMuted.withValues(alpha: 0.4)),
                           const SizedBox(height: 12),
-                          const Text('예정된 매치가 없습니다', style: TextStyle(color: AppTheme.textMuted, fontSize: 14)),
+                          Text(
+                            _searchQuery.isEmpty ? '예정된 매치가 없습니다' : '검색 결과가 없습니다',
+                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                          ),
                         ],
                       ),
                     );
@@ -50,10 +100,10 @@ class MatchTabPage extends ConsumerWidget {
                   return ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                    itemCount: matches.length,
+                    itemCount: filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
-                      final match = matches[index];
+                      final match = filtered[index];
                       return _MatchListTile(match: match, index: index);
                     },
                   );

@@ -5,22 +5,36 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../features/matches/presentation/providers/match_providers.dart';
+import '../../features/notifications/presentation/providers/fcm_provider.dart';
 import 'app_top_bar.dart';
 
-class MainShell extends ConsumerWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final todayCount = ref.watch(todayMatchCountProvider);
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends ConsumerState<MainShell> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(fcmProvider).syncTokenToFirestore();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final todayCount = ref.watch(todayOrLiveMatchCountProvider);
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
       body: Column(
         children: [
           const AppTopBar(),
-          Expanded(child: navigationShell),
+          Expanded(child: widget.navigationShell),
         ],
       ),
       bottomNavigationBar: Container(
@@ -43,30 +57,30 @@ class MainShell extends ConsumerWidget {
                   icon: PhosphorIconsRegular.house,
                   activeIcon: PhosphorIconsFill.house,
                   label: '홈',
-                  isActive: navigationShell.currentIndex == 0,
-                  onTap: () => navigationShell.goBranch(0),
+                  isActive: widget.navigationShell.currentIndex == 0,
+                  onTap: () => widget.navigationShell.goBranch(0),
                 ),
                 _NavItem(
                   icon: PhosphorIconsRegular.calendarBlank,
                   activeIcon: PhosphorIconsFill.calendar,
                   label: '일정',
-                  isActive: navigationShell.currentIndex == 1,
-                  onTap: () => navigationShell.goBranch(1),
+                  isActive: widget.navigationShell.currentIndex == 1,
+                  onTap: () => widget.navigationShell.goBranch(1),
                 ),
                 _NavItem(
                   icon: PhosphorIconsRegular.soccerBall,
                   activeIcon: PhosphorIconsFill.soccerBall,
                   label: '매치',
-                  isActive: navigationShell.currentIndex == 2,
-                  onTap: () => navigationShell.goBranch(2),
+                  isActive: widget.navigationShell.currentIndex == 2,
+                  onTap: () => widget.navigationShell.goBranch(2),
                   badgeCount: todayCount > 0 ? todayCount : null,
                 ),
                 _NavItem(
                   icon: PhosphorIconsRegular.user,
                   activeIcon: PhosphorIconsFill.user,
                   label: 'MY',
-                  isActive: navigationShell.currentIndex == 3,
-                  onTap: () => navigationShell.goBranch(3),
+                  isActive: widget.navigationShell.currentIndex == 3,
+                  onTap: () => widget.navigationShell.goBranch(3),
                 ),
               ],
             ),

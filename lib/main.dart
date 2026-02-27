@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,16 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'app/app.dart';
 import 'app/providers/firebase_ready_provider.dart';
 import 'firebase_options.dart';
+
+/// FCM: 앱 종료 상태에서 알림 수신 시 (탭하여 앱 열기 전 호출)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (kDebugMode) {
+    // ignore: avoid_print
+    print('[FCM] 백그라운드 메시지: ${message.messageId}');
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +41,9 @@ Future<bool> _initializeFirebase() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+
+    // FCM 백그라운드 핸들러 등록
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     // Firestore 오프라인 캐시 (네트워크 불안정 시에도 캐시된 데이터 표시)
     FirebaseFirestore.instance.settings = const Settings(

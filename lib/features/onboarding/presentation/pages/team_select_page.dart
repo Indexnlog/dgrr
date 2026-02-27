@@ -22,6 +22,8 @@ class TeamSelectPage extends ConsumerStatefulWidget {
 class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
   String? _selectedTeamId;
   bool _isSigningIn = false;
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
   ProviderSubscription<AsyncValue<List<PublicTeam>>>? _teamsSubscription;
 
   @override
@@ -40,6 +42,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
   @override
   void dispose() {
     _teamsSubscription?.close();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -268,11 +271,33 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
             ),
         ],
       ),
-      body: teamsAsync.when(
-        data: (teams) {
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: teams.length + (firebaseReady ? 0 : 1),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+              decoration: InputDecoration(
+                hintText: '팀명, 지역으로 검색',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                isDense: true,
+              ),
+            ),
+          ),
+          Expanded(
+            child: teamsAsync.when(
+              data: (teams) {
+                final filtered = _searchQuery.isEmpty
+                    ? teams
+                    : teams.where((t) =>
+                        t.name.toLowerCase().contains(_searchQuery) ||
+                        t.region.toLowerCase().contains(_searchQuery) ||
+                        t.intro.toLowerCase().contains(_searchQuery)).toList();
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filtered.length + (firebaseReady ? 0 : 1),
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               if (!firebaseReady && index == 0) {
@@ -282,7 +307,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
               }
 
               final teamIndex = firebaseReady ? index : index - 1;
-              final team = teams[teamIndex];
+              final team = filtered[teamIndex];
               final isSelected = _selectedTeamId == team.id;
 
               return _TeamCard(
@@ -300,13 +325,16 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
               );
             },
           );
-        },
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
-        error: (_, __) => const Center(
-          child: Text('팀 목록을 불러오는 중 문제가 발생했습니다.'),
-        ),
+              },
+              loading: () => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              error: (_, __) => const Center(
+                child: Text('팀 목록을 불러오는 중 문제가 발생했습니다.'),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

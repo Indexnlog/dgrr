@@ -340,9 +340,9 @@ class _HomePageState extends ConsumerState<HomePage>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppTheme.fixedBlue.withOpacity(0.1),
+            color: AppTheme.fixedBlue.withValues(alpha:0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.fixedBlue.withOpacity(0.3)),
+            border: Border.all(color: AppTheme.fixedBlue.withValues(alpha:0.3)),
           ),
           child: Row(
             children: [
@@ -399,7 +399,7 @@ class _HomePageState extends ConsumerState<HomePage>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '오늘의 투표 $count건',
+                  '회비·출석 투표 $count건 진행중',
                   style: const TextStyle(
                     color: AppTheme.attendGreen,
                     fontSize: 14,
@@ -509,10 +509,30 @@ class _MatchCard extends ConsumerStatefulWidget {
 }
 
 class _MatchCardState extends ConsumerState<_MatchCard> {
-  bool _isVoting = false;
+  /// Optimistic UI: null=없음, true=참석, false=불참
+  bool? _optimisticVote;
+  /// Optimistic UI: 공 가져가기 자원
+  bool? _optimisticBallBring;
+
+  Future<void> _handleBallBringToggle(Match match) async {
+    if (widget.uid == null) return;
+    final isBringing = match.ballBringers?.contains(widget.uid) ?? false;
+    setState(() => _optimisticBallBring = !isBringing);
+    try {
+      await toggleBallBringer(ref, match, widget.uid!);
+      if (mounted) setState(() => _optimisticBallBring = null);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _optimisticBallBring = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('반영 실패: $e')),
+        );
+      }
+    }
+  }
 
   Future<void> _handleVote(bool attend) async {
-    if (widget.uid == null || _isVoting) return;
+    if (widget.uid == null) return;
 
     // 불참: PRD에 따라 사유 입력 필수
     if (!attend) {
@@ -520,11 +540,18 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
       return;
     }
 
-    setState(() => _isVoting = true);
+    // Optimistic UI: 바로 반영
+    setState(() => _optimisticVote = true);
     try {
       await voteAttend(ref, widget.match, widget.uid!);
-    } finally {
-      if (mounted) setState(() => _isVoting = false);
+      if (mounted) setState(() => _optimisticVote = null);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _optimisticVote = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('참석 반영 실패: $e')),
+        );
+      }
     }
   }
 
@@ -573,7 +600,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                             horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? AppTheme.teamRed.withOpacity(0.2)
+                              ? AppTheme.teamRed.withValues(alpha:0.2)
                               : AppTheme.surface,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
@@ -636,7 +663,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                   final reason = controller.text.trim();
                   if (reason.isEmpty) return;
                   Navigator.pop(ctx);
-                  setState(() => _isVoting = true);
+                  setState(() => _optimisticVote = false);
                   try {
                     await voteAbsentWithReason(
                       ref,
@@ -644,8 +671,14 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                       widget.uid!,
                       reason,
                     );
-                  } finally {
-                    if (mounted) setState(() => _isVoting = false);
+                    if (mounted) setState(() => _optimisticVote = null);
+                  } catch (e) {
+                    if (mounted) {
+                      setState(() => _optimisticVote = null);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('불참 반영 실패: $e')),
+                      );
+                    }
                   }
                 },
                 child: const Text('확인',
@@ -662,8 +695,24 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
   @override
   Widget build(BuildContext context) {
     final match = widget.match;
-    final attendees = match.attendees ?? [];
-    final absentees = match.absentees ?? [];
+    var attendees = List<String>.from(match.attendees ?? []);
+    var absentees = List<String>.from(match.absentees ?? []);
+    var ballBringers = List<String>.from(match.ballBringers ?? []);
+    if (_optimisticVote != null && widget.uid != null) {
+      attendees = attendees.where((u) => u != widget.uid).toList();
+      absentees = absentees.where((u) => u != widget.uid).toList();
+      if (_optimisticVote!) {
+        attendees = [...attendees, widget.uid!];
+      } else {
+        absentees = [...absentees, widget.uid!];
+      }
+    }
+    if (_optimisticBallBring != null && widget.uid != null) {
+      ballBringers = ballBringers.where((u) => u != widget.uid).toList();
+      if (_optimisticBallBring!) {
+        ballBringers = [...ballBringers, widget.uid!];
+      }
+    }
     final isAttending = widget.uid != null && attendees.contains(widget.uid);
     final isAbsent = widget.uid != null && absentees.contains(widget.uid);
     final memberMap = ref.watch(memberMapProvider);
@@ -684,7 +733,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
         color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: widget.isNext ? AppTheme.teamRed.withOpacity(0.4) : AppTheme.divider,
+          color: widget.isNext ? AppTheme.teamRed.withValues(alpha:0.4) : AppTheme.divider,
           width: widget.isNext ? 1.5 : 1,
         ),
       ),
@@ -706,6 +755,11 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                 ),
                 const SizedBox(height: 14),
                 _buildAttendeeList(attendees, notVotedCount, memberMap),
+                const SizedBox(height: 16),
+                _buildBallBringerSection(
+                  match.copyWith(ballBringers: ballBringers),
+                  memberMap,
+                ),
                 const SizedBox(height: 20),
                 _buildVoteButtons(isAttending, isAbsent),
               ],
@@ -740,7 +794,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: widget.isNext
-                    ? AppTheme.teamRed.withOpacity(0.2)
+                    ? AppTheme.teamRed.withValues(alpha:0.2)
                     : AppTheme.surface,
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -838,7 +892,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withOpacity(0.5),
+        color: AppTheme.surface.withValues(alpha:0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.divider, width: 0.5),
       ),
@@ -935,7 +989,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                     child: FractionallySizedBox(
                       widthFactor: absentProgress,
                       child: Container(
-                        color: AppTheme.absentRed.withOpacity(0.4),
+                        color: AppTheme.absentRed.withValues(alpha:0.4),
                       ),
                     ),
                   ),
@@ -948,7 +1002,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                       gradient: LinearGradient(
                         colors: [
                           AppTheme.attendGreen,
-                          AppTheme.attendGreen.withOpacity(0.7),
+                          AppTheme.attendGreen.withValues(alpha:0.7),
                         ],
                       ),
                     ),
@@ -962,7 +1016,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                   bottom: 0,
                   child: Container(
                     width: 2,
-                    color: AppTheme.gold.withOpacity(0.8),
+                    color: AppTheme.gold.withValues(alpha:0.8),
                   ),
                 ),
               ],
@@ -975,7 +1029,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
             _Legend(color: AppTheme.attendGreen, label: '참석 $attendCount'),
             const SizedBox(width: 16),
             _Legend(
-                color: AppTheme.absentRed.withOpacity(0.6),
+                color: AppTheme.absentRed.withValues(alpha:0.6),
                 label: '불참 $absentCount'),
             const SizedBox(width: 16),
             _Legend(color: AppTheme.gold, label: '최소 $minPlayers명'),
@@ -1046,10 +1100,10 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppTheme.attendGreen.withOpacity(0.12),
+                  color: AppTheme.attendGreen.withValues(alpha:0.12),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: AppTheme.attendGreen.withOpacity(0.25),
+                    color: AppTheme.attendGreen.withValues(alpha:0.25),
                     width: 0.5,
                   ),
                 ),
@@ -1060,7 +1114,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                       Text(
                         '#$number',
                         style: TextStyle(
-                          color: AppTheme.attendGreen.withOpacity(0.7),
+                          color: AppTheme.attendGreen.withValues(alpha:0.7),
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                         ),
@@ -1084,12 +1138,110 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     );
   }
 
+  Widget _buildBallBringerSection(
+    Match match,
+    Map<String, Member> memberMap,
+  ) {
+    final ballBringers = match.ballBringers ?? [];
+    final isBringing = widget.uid != null && ballBringers.contains(widget.uid);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.sports_soccer, size: 14, color: AppTheme.textMuted),
+            const SizedBox(width: 6),
+            Text(
+              '공 가져오실 분?',
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            GestureDetector(
+              onTap: widget.uid == null
+                  ? null
+                  : () => _handleBallBringToggle(match),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isBringing
+                      ? AppTheme.accentLime.withValues(alpha: 0.2)
+                      : AppTheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isBringing
+                        ? AppTheme.accentLime
+                        : AppTheme.divider,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isBringing ? Icons.check_circle : Icons.add_circle_outline,
+                      size: 16,
+                      color: isBringing
+                          ? AppTheme.accentLime
+                          : AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isBringing ? '들고갈게요 ✓' : '저도 들고가요',
+                      style: TextStyle(
+                        color: isBringing
+                            ? AppTheme.accentLime
+                            : AppTheme.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (ballBringers.isNotEmpty) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: ballBringers.map((uid) {
+                    final m = memberMap[uid];
+                    final name = m?.uniformName ?? m?.name ?? uid.substring(0, 4);
+                    return Text(
+                      name,
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildVoteButtons(bool isAttending, bool isAbsent) {
     return Row(
       children: [
         Expanded(
           child: GestureDetector(
-            onTap: _isVoting ? null : () => _handleVote(true),
+            onTap: () => _handleVote(true),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
@@ -1103,16 +1255,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                 ),
               ),
               child: Center(
-                child: _isVoting && !isAbsent
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppTheme.textPrimary,
-                        ),
-                      )
-                    : Row(
+                child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -1143,7 +1286,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
         const SizedBox(width: 12),
         Expanded(
           child: GestureDetector(
-            onTap: _isVoting ? null : () => _handleVote(false),
+            onTap: () => _handleVote(false),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
@@ -1157,16 +1300,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                 ),
               ),
               child: Center(
-                child: _isVoting && !isAttending
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppTheme.textPrimary,
-                        ),
-                      )
-                    : Row(
+                child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(

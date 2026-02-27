@@ -10,6 +10,7 @@ import '../../features/matches/presentation/pages/home_page.dart';
 import '../../features/matches/presentation/pages/match_create_page.dart';
 import '../../features/matches/presentation/pages/match_detail_page.dart';
 import '../../features/matches/presentation/pages/match_tab_page.dart';
+import '../../features/opponents/presentation/pages/opponent_list_page.dart';
 import '../../features/mypage/presentation/pages/my_page.dart';
 import '../../features/onboarding/presentation/pages/team_select_page.dart';
 import '../../features/polls/presentation/pages/poll_create_page.dart';
@@ -174,6 +175,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                     path: 'create',
                     name: 'match-create',
                     builder: (context, state) => const MatchCreatePage(),
+                  ),
+                  GoRoute(
+                    path: 'opponents',
+                    name: 'opponent-list',
+                    builder: (context, state) => const OpponentListPage(),
                   ),
                   GoRoute(
                     path: ':matchId',

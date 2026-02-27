@@ -12,4 +12,11 @@ abstract class TeamRepository {
     required String memberId,
     required String photoUrl,
   });
+
+  /// 멤버 FCM 토큰 업데이트 (푸시 알림용)
+  Future<void> updateMemberFcmToken({
+    required String teamId,
+    required String memberId,
+    required String? fcmToken,
+  });
 }

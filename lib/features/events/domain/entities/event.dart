@@ -234,7 +234,9 @@ class EventAttendee {
 enum AttendeeStatus {
   attending,
   late,
-  absent;
+  absent,
+  /// 이벤트 종료 후 참석 확정 (attending/late → attended 자동 전환)
+  attended;
 
   String get value {
     switch (this) {
@@ -244,6 +246,8 @@ enum AttendeeStatus {
         return 'late';
       case AttendeeStatus.absent:
         return 'absent';
+      case AttendeeStatus.attended:
+        return 'attended';
     }
   }
 
@@ -256,6 +260,8 @@ enum AttendeeStatus {
         return AttendeeStatus.late;
       case 'absent':
         return AttendeeStatus.absent;
+      case 'attended':
+        return AttendeeStatus.attended;
       default:
         return null;
     }

@@ -106,6 +106,7 @@
 - `joinedAt`: Timestamp
 - `enrolledAt`: Timestamp
 - `memo`: String (관리자 메모)
+- `fcmToken`: String (FCM 푸시 알림용, 로그인 시 저장)
 
 **인덱스:**
 - `status` (ascending)
@@ -143,6 +144,7 @@
 - `attendees`: Array<String> (참석자 UID 배열)
 - `absentees`: Array<String> (불참자 UID 배열)
 - `absenceReasons`: Map — 불참 사유 { uid: { reason, timestamp } }
+- `ballBringers`: Array<String> — 공 가져가기 자원자 UID ("저도 들고가요" 방식)
 - `createdBy`: String (등록자 UID)
 - `createdAt`: Timestamp
 - `updatedAt`: Timestamp

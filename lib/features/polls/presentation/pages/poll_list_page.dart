@@ -53,7 +53,7 @@ class PollListPage extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.ballot_outlined,
-                      size: 48, color: _DS.textMuted.withOpacity(0.4)),
+                      size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
                   const SizedBox(height: 12),
                   Text('아직 투표가 없습니다',
                       style: TextStyle(color: _DS.textMuted, fontSize: 14)),
@@ -100,7 +100,7 @@ class _PollCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
               color: isActive
-                  ? _DS.gold.withOpacity(0.4)
+                  ? _DS.gold.withValues(alpha:0.4)
                   : _DS.divider),
         ),
         child: Column(
@@ -113,7 +113,7 @@ class _PollCard extends StatelessWidget {
                       horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? _DS.attendGreen.withOpacity(0.15)
+                        ? _DS.attendGreen.withValues(alpha:0.15)
                         : _DS.surface,
                     borderRadius: BorderRadius.circular(6),
                   ),

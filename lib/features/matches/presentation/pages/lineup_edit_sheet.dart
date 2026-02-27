@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/errors.dart';
 import '../../../teams/domain/entities/member.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_members_provider.dart';
@@ -57,12 +58,25 @@ class _LineupEditSheet extends ConsumerStatefulWidget {
   ConsumerState<_LineupEditSheet> createState() => _LineupEditSheetState();
 }
 
+List<Member> _filterMembers(List<Member> members, String query) {
+  if (query.isEmpty) return members;
+  final q = query.trim().toLowerCase();
+  return members.where((m) {
+    final name = m.name.toLowerCase();
+    final uniform = (m.uniformName ?? '').toLowerCase();
+    final numStr = m.number?.toString() ?? '';
+    return name.contains(q) || uniform.contains(q) || numStr.contains(q);
+  }).toList();
+}
+
 class _LineupEditSheetState extends ConsumerState<_LineupEditSheet> {
   late List<String> _orderedUids;
   late int _lineupSize;
   String? _captainId;
   bool _announceOnMatchDay = false;
   bool _saving = false;
+  final _searchController = TextEditingController();
+  String _lineupSearchQuery = '';
 
   @override
   void initState() {
@@ -74,6 +88,12 @@ class _LineupEditSheetState extends ConsumerState<_LineupEditSheet> {
     }
     _lineupSize = widget.match.effectiveLineupSize;
     _captainId = widget.match.captainId;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   DateTime? _matchStartDateTime() {
@@ -171,7 +191,7 @@ class _LineupEditSheetState extends ConsumerState<_LineupEditSheet> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   decoration: BoxDecoration(
-                    color: selected ? _C.green.withOpacity(0.2) : _C.muted.withOpacity(0.2),
+                    color: selected ? _C.green.withValues(alpha:0.2) : _C.muted.withValues(alpha:0.2),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: selected ? _C.green : _C.divider,
@@ -257,84 +277,138 @@ class _LineupEditSheetState extends ConsumerState<_LineupEditSheet> {
   }
 
   Widget _buildReorderList(Map<String, Member> memberMap) {
+    final orderedMembers = _orderedUids
+        .map((uid) => memberMap[uid])
+        .whereType<Member>()
+        .toList();
+    final filteredMembers = _filterMembers(orderedMembers, _lineupSearchQuery);
+    final showSearch = _orderedUids.length > 8;
+    final isFiltered = _lineupSearchQuery.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '순서 (앞 ${_lineupSize}명 = 선발)',
+          '순서 (앞 $_lineupSize명 = 선발)',
           style: const TextStyle(color: _C.sub, fontSize: 12, fontWeight: FontWeight.w600),
         ),
+        if (showSearch) ...[
+          const SizedBox(height: 8),
+          TextField(
+            controller: _searchController,
+            onChanged: (v) => setState(() => _lineupSearchQuery = v.trim()),
+            style: const TextStyle(color: _C.text),
+            decoration: InputDecoration(
+              hintText: '이름, 등번호로 검색',
+              hintStyle: const TextStyle(color: _C.muted),
+              prefixIcon: const Icon(Icons.search, color: _C.muted, size: 20),
+              filled: true,
+              fillColor: _C.card,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              isDense: true,
+            ),
+          ),
+          if (isFiltered)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '검색 중: 순서 변경 불가. 검색을 지우면 드래그로 변경 가능.',
+                style: TextStyle(color: _C.muted, fontSize: 11),
+              ),
+            ),
+        ],
         const SizedBox(height: 8),
-        ReorderableListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _orderedUids.length,
-          onReorder: (oldIndex, newIndex) {
-            setState(() {
-              if (newIndex > oldIndex) newIndex--;
-              final item = _orderedUids.removeAt(oldIndex);
-              _orderedUids.insert(newIndex, item);
-            });
-          },
-          itemBuilder: (context, index) {
-            final uid = _orderedUids[index];
-            final member = memberMap[uid];
-            final isStarter = index < _lineupSize;
-            return Container(
-              key: ValueKey(uid),
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isStarter ? _C.green.withOpacity(0.1) : _C.card,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _C.divider),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.drag_handle, color: _C.muted, size: 20),
-                  const SizedBox(width: 12),
-                  Text(
-                    '${index + 1}',
-                    style: const TextStyle(color: _C.sub, fontSize: 12, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    member?.name ?? uid,
-                    style: const TextStyle(color: _C.text, fontWeight: FontWeight.w600),
-                  ),
-                  if (member?.number != null) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _C.muted.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${member!.number}번',
-                        style: const TextStyle(color: _C.sub, fontSize: 11),
-                      ),
-                    ),
-                  ],
-                  if (_captainId == uid) ...[
-                    const SizedBox(width: 8),
-                    const Text('(주장)', style: TextStyle(color: _C.green, fontSize: 12)),
-                  ],
-                  const Spacer(),
-                  Text(
-                    isStarter ? '선발' : '벤치',
-                    style: TextStyle(
-                      color: isStarter ? _C.green : _C.muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+        if (isFiltered)
+          _buildFilteredList(filteredMembers)
+        else
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _orderedUids.length,
+            onReorder: (oldIndex, newIndex) {
+              setState(() {
+                if (newIndex > oldIndex) newIndex--;
+                final item = _orderedUids.removeAt(oldIndex);
+                _orderedUids.insert(newIndex, item);
+              });
+            },
+            itemBuilder: (context, index) {
+              final uid = _orderedUids[index];
+              final member = memberMap[uid];
+              final isStarter = index < _lineupSize;
+              return _buildMemberRow(uid, member, index + 1, isStarter);
+            },
+          ),
       ],
+    );
+  }
+
+  Widget _buildFilteredList(List<Member> filteredMembers) {
+    return Column(
+      children: filteredMembers.asMap().entries.map((e) {
+        final idx = _orderedUids.indexOf(e.value.memberId);
+        final isStarter = idx >= 0 && idx < _lineupSize;
+        return _buildMemberRow(e.value.memberId, e.value, idx >= 0 ? idx + 1 : e.key + 1, isStarter, showDragHandle: false);
+      }).toList(),
+    );
+  }
+
+  Widget _buildMemberRow(String uid, Member? member, int displayIndex, bool isStarter, {bool showDragHandle = true}) {
+    return Container(
+      key: ValueKey(uid),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isStarter ? _C.green.withValues(alpha:0.1) : _C.card,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _C.divider),
+      ),
+      child: Row(
+        children: [
+          if (showDragHandle)
+            Icon(Icons.drag_handle, color: _C.muted, size: 20)
+          else
+            const SizedBox(width: 20),
+          const SizedBox(width: 12),
+          Text(
+            '$displayIndex',
+            style: const TextStyle(color: _C.sub, fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            member?.name ?? uid,
+            style: const TextStyle(color: _C.text, fontWeight: FontWeight.w600),
+          ),
+          if (member?.number != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: _C.muted.withValues(alpha:0.3),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '${member!.number}번',
+                style: const TextStyle(color: _C.sub, fontSize: 11),
+              ),
+            ),
+          ],
+          if (_captainId == uid) ...[
+            const SizedBox(width: 8),
+            const Text('(주장)', style: TextStyle(color: _C.green, fontSize: 12)),
+          ],
+          const Spacer(),
+          Text(
+            isStarter ? '선발' : '벤치',
+            style: TextStyle(
+              color: isStarter ? _C.green : _C.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -390,9 +464,7 @@ class _LineupEditSheetState extends ConsumerState<_LineupEditSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: $e'), backgroundColor: _C.red),
-        );
+        ErrorHandler.showError(context, e, fallback: '저장에 실패했습니다');
       }
     } finally {
       if (mounted) setState(() => _saving = false);

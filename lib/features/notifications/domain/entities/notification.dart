@@ -7,6 +7,8 @@ class Notification {
     this.type,
     this.relatedId,
     this.toUserId,
+    this.readBy,
+    this.targetGroup,
     this.isSent,
     this.sendAt,
     this.createdAt,
@@ -18,6 +20,10 @@ class Notification {
   final String? type;
   final String? relatedId;
   final List<String>? toUserId;
+  /// 읽은 사용자 UID 목록
+  final List<String>? readBy;
+  /// 발송 대상 그룹 (allMembers, managers 등)
+  final String? targetGroup;
   final bool? isSent;
   final DateTime? sendAt;
   final DateTime? createdAt;
@@ -29,6 +35,8 @@ class Notification {
     String? type,
     String? relatedId,
     List<String>? toUserId,
+    List<String>? readBy,
+    String? targetGroup,
     bool? isSent,
     DateTime? sendAt,
     DateTime? createdAt,
@@ -40,6 +48,8 @@ class Notification {
       type: type ?? this.type,
       relatedId: relatedId ?? this.relatedId,
       toUserId: toUserId ?? this.toUserId,
+      readBy: readBy ?? this.readBy,
+      targetGroup: targetGroup ?? this.targetGroup,
       isSent: isSent ?? this.isSent,
       sendAt: sendAt ?? this.sendAt,
       createdAt: createdAt ?? this.createdAt,

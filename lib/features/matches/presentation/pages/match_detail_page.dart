@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/errors.dart';
+
 import '../../../auth/presentation/providers/auth_state_provider.dart';
+import '../../../opponents/domain/entities/opponent.dart';
+import '../../../opponents/presentation/providers/opponent_providers.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/domain/entities/member.dart';
 import '../../../teams/presentation/providers/team_members_provider.dart';
@@ -11,6 +15,7 @@ import '../../domain/entities/record.dart';
 import '../../domain/entities/round.dart';
 import '../providers/match_detail_providers.dart';
 import '../providers/match_providers.dart';
+import '../../../match_media/presentation/widgets/match_media_section.dart';
 import 'lineup_edit_sheet.dart';
 import 'record_modals.dart';
 
@@ -95,6 +100,8 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
           const SizedBox(height: 16),
         ],
         _MatchInfoCard(match: match, matchId: widget.matchId),
+        const SizedBox(height: 12),
+        _BallBringerChip(match: match),
         const SizedBox(height: 16),
         _GameControlBar(
           match: match,
@@ -102,6 +109,11 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
         ),
         const SizedBox(height: 20),
         _LineupSection(match: match, matchId: widget.matchId),
+        const SizedBox(height: 20),
+        MatchMediaSection(
+          matchId: widget.matchId,
+          opponentName: match.opponentName,
+        ),
         const SizedBox(height: 20),
         _SectionHeader(
           title: '라운드',
@@ -266,9 +278,7 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('저장 실패: $e')),
-                    );
+                    ErrorHandler.showError(context, e, fallback: '저장에 실패했습니다');
                   }
                 }
               },
@@ -331,10 +341,10 @@ class _DDayBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: isToday ? _C.red.withOpacity(0.15) : _C.muted.withOpacity(0.2),
+        color: isToday ? _C.red.withValues(alpha:0.15) : _C.muted.withValues(alpha:0.2),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isToday ? _C.red.withOpacity(0.5) : _C.muted.withOpacity(0.3),
+          color: isToday ? _C.red.withValues(alpha:0.5) : _C.muted.withValues(alpha:0.3),
           width: 1,
         ),
       ),
@@ -359,7 +369,7 @@ class _DDayBanner extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               '오늘 경기입니다!',
-              style: TextStyle(color: _C.red.withOpacity(0.9), fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(color: _C.red.withValues(alpha:0.9), fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ],
         ],
@@ -410,9 +420,9 @@ class _LineupSection extends ConsumerWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _C.green.withOpacity(0.15),
+                      color: _C.green.withValues(alpha:0.15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _C.green.withOpacity(0.4)),
+                      border: Border.all(color: _C.green.withValues(alpha:0.4)),
                     ),
                     child: const Text(
                       '라인업 설정',
@@ -552,7 +562,7 @@ class _MatchInfoCard extends ConsumerWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _C.muted.withOpacity(0.2),
+                      color: _C.muted.withValues(alpha:0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text('상대팀 수정', style: TextStyle(color: _C.sub, fontSize: 11, fontWeight: FontWeight.w600)),
@@ -661,6 +671,16 @@ class _MatchInfoCard extends ConsumerWidget {
           contact: contactController.text.trim().isEmpty ? null : contactController.text.trim(),
           status: status,
         );
+        final opponentId = match.opponent?.teamId;
+        if (opponentId != null) {
+          await ref.read(opponentDataSourceProvider).updateOpponent(
+            teamId,
+            opponentId,
+            name: nameController.text.trim(),
+            contact: contactController.text.trim().isEmpty ? null : contactController.text.trim(),
+            status: status,
+          );
+        }
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('상대팀 정보가 수정되었습니다'), backgroundColor: _C.green),
@@ -668,9 +688,7 @@ class _MatchInfoCard extends ConsumerWidget {
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('수정 실패: $e'), backgroundColor: _C.red),
-          );
+          ErrorHandler.showError(context, e, fallback: '수정에 실패했습니다');
         }
       }
     }
@@ -691,7 +709,7 @@ class _StatusChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? _C.green.withOpacity(0.15) : _C.muted.withOpacity(0.2),
+          color: selected ? _C.green.withValues(alpha:0.15) : _C.muted.withValues(alpha:0.2),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: selected ? _C.green : _C.divider),
         ),
@@ -723,6 +741,74 @@ class _InfoChip extends StatelessWidget {
                maxLines: 1, overflow: TextOverflow.ellipsis),
         ],
       ),
+    );
+  }
+}
+
+// ── 공 가져가기 ("저도 들고가요") ──
+
+class _BallBringerChip extends ConsumerWidget {
+  const _BallBringerChip({required this.match});
+  final Match match;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUserProvider)?.uid;
+    final memberMap = ref.watch(memberMapProvider);
+    final ballBringers = match.ballBringers ?? [];
+    final isBringing = uid != null && ballBringers.contains(uid);
+
+    return Row(
+      children: [
+        Icon(Icons.sports_soccer, size: 16, color: _C.muted),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: uid == null ? null : () => toggleBallBringer(ref, match, uid),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isBringing ? _C.green.withValues(alpha: 0.15) : _C.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isBringing ? _C.green : _C.divider,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isBringing ? Icons.check_circle : Icons.add_circle_outline,
+                  size: 14,
+                  color: isBringing ? _C.green : _C.sub,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  isBringing ? '들고갈게요 ✓' : '저도 들고가요',
+                  style: TextStyle(
+                    color: isBringing ? _C.green : _C.sub,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (ballBringers.isNotEmpty) ...[
+          const SizedBox(width: 12),
+          ...ballBringers.map((u) {
+            final m = memberMap[u];
+            final name = m?.uniformName ?? m?.name ?? u.substring(0, 4);
+            return Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Text(
+                name,
+                style: const TextStyle(color: _C.muted, fontSize: 11),
+              ),
+            );
+          }),
+        ],
+      ],
     );
   }
 }
@@ -800,6 +886,30 @@ class _GameControlBar extends ConsumerWidget {
                   final teamId = ref.read(currentTeamIdProvider);
                   if (teamId == null) return;
                   await ref.read(roundRecordDataSourceProvider).endMatch(teamId, matchId);
+
+                  final opponentId = match.opponent?.teamId;
+                  if (opponentId != null) {
+                    final rounds = ref.read(matchRoundsProvider(matchId)).value ?? [];
+                    var ourTotal = 0;
+                    var oppTotal = 0;
+                    for (final r in rounds) {
+                      ourTotal += r.ourScore ?? 0;
+                      oppTotal += r.oppScore ?? 0;
+                    }
+                    final result = ourTotal > oppTotal ? 'W' : ourTotal < oppTotal ? 'L' : 'D';
+                    final oppDs = ref.read(opponentDataSourceProvider);
+                    final current = await oppDs.getOpponent(teamId, opponentId);
+                    final rec = current?.records ?? const OpponentRecords();
+                    final newRec = OpponentRecords(
+                      wins: rec.wins + (result == 'W' ? 1 : 0),
+                      draws: rec.draws + (result == 'D' ? 1 : 0),
+                      losses: rec.losses + (result == 'L' ? 1 : 0),
+                    );
+                    final recent = [...?current?.recentResults];
+                    recent.insert(0, result);
+                    if (recent.length > 10) recent.removeLast();
+                    await oppDs.updateRecords(teamId, opponentId, recentResults: recent, records: newRec);
+                  }
                 }
               },
             ),
@@ -822,9 +932,9 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha:0.15),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.4)),
+          border: Border.all(color: color.withValues(alpha:0.4)),
         ),
         child: Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
       ),
@@ -851,9 +961,9 @@ class _AddRoundButton extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: _C.blue.withOpacity(0.12),
+          color: _C.blue.withValues(alpha:0.12),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _C.blue.withOpacity(0.3)),
+          border: Border.all(color: _C.blue.withValues(alpha:0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -906,7 +1016,7 @@ class _RoundCard extends ConsumerWidget {
         color: _C.card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: round.status == RoundStatus.playing ? _C.green.withOpacity(0.4) : _C.divider,
+          color: round.status == RoundStatus.playing ? _C.green.withValues(alpha:0.4) : _C.divider,
         ),
       ),
       child: Column(
@@ -926,7 +1036,7 @@ class _RoundCard extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.15),
+                      color: statusColor.withValues(alpha:0.15),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w700)),
@@ -996,9 +1106,9 @@ class _RoundActionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha:0.12),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha:0.3)),
         ),
         child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
       ),
@@ -1089,7 +1199,7 @@ class _RecordRow extends StatelessWidget {
           Container(
             width: 24, height: 24,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.15),
+              color: iconColor.withValues(alpha:0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 14, color: iconColor),
@@ -1153,7 +1263,7 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Column(
         children: [
-          Icon(icon, size: 40, color: _C.muted.withOpacity(0.5)),
+          Icon(icon, size: 40, color: _C.muted.withValues(alpha:0.5)),
           const SizedBox(height: 12),
           Text(message, style: TextStyle(color: _C.muted, fontSize: 13)),
         ],

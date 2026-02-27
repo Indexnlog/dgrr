@@ -68,7 +68,7 @@ class GroundManagementPage extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.stadium_outlined,
-                      size: 48, color: _DS.textMuted.withOpacity(0.4)),
+                      size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
                   const SizedBox(height: 12),
                   Text('등록된 구장이 없습니다',
                       style: TextStyle(color: _DS.textMuted, fontSize: 14)),
@@ -141,7 +141,7 @@ class _GroundCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: isActive
-                      ? _DS.attendGreen.withOpacity(0.15)
+                      ? _DS.attendGreen.withValues(alpha:0.15)
                       : _DS.surface,
                   borderRadius: BorderRadius.circular(6),
                 ),

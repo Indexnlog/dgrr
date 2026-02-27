@@ -51,6 +51,7 @@ class Match {
     this.attendees,
     this.absentees,
     this.absenceReasons,
+    this.ballBringers,
     this.lineup,
     this.lineupSize,
     this.captainId,
@@ -85,6 +86,8 @@ class Match {
   final List<String>? absentees;
   /// 불참 사유 { uid: { reason: String, timestamp: DateTime } }
   final Map<String, dynamic>? absenceReasons;
+  /// 공 가져가기 자원자 UID 배열 ("저도 들고가요" 방식)
+  final List<String>? ballBringers;
   /// 선발 순서 (UID 배열, 앞 N명이 필드)
   final List<String>? lineup;
   /// 필드 선수 수 (기본 5, 풋살)
@@ -134,6 +137,7 @@ class Match {
     List<String>? attendees,
     List<String>? absentees,
     Map<String, dynamic>? absenceReasons,
+    List<String>? ballBringers,
     List<String>? lineup,
     int? lineupSize,
     String? captainId,
@@ -162,6 +166,7 @@ class Match {
       attendees: attendees ?? this.attendees,
       absentees: absentees ?? this.absentees,
       absenceReasons: absenceReasons ?? this.absenceReasons,
+      ballBringers: ballBringers ?? this.ballBringers,
       lineup: lineup ?? this.lineup,
       lineupSize: lineupSize ?? this.lineupSize,
       captainId: captainId ?? this.captainId,

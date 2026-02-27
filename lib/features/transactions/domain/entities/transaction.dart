@@ -7,6 +7,10 @@ class Transaction {
     this.userId,
     this.description,
     this.status,
+    this.date,
+    this.category,
+    this.memo,
+    this.createdBy,
     this.createdAt,
     this.completedAt,
   });
@@ -17,6 +21,14 @@ class Transaction {
   final String? userId;
   final String? description;
   final TransactionStatus? status;
+  /// 거래 날짜 (createdAt과 별도)
+  final DateTime? date;
+  /// 분류 (수강료, 회비, 구장비 등)
+  final String? category;
+  /// 메모
+  final String? memo;
+  /// 등록자 UID
+  final String? createdBy;
   final DateTime? createdAt;
   final DateTime? completedAt;
 
@@ -27,6 +39,10 @@ class Transaction {
     String? userId,
     String? description,
     TransactionStatus? status,
+    DateTime? date,
+    String? category,
+    String? memo,
+    String? createdBy,
     DateTime? createdAt,
     DateTime? completedAt,
   }) {
@@ -37,6 +53,10 @@ class Transaction {
       userId: userId ?? this.userId,
       description: description ?? this.description,
       status: status ?? this.status,
+      date: date ?? this.date,
+      category: category ?? this.category,
+      memo: memo ?? this.memo,
+      createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       completedAt: completedAt ?? this.completedAt,
     );
@@ -55,7 +75,9 @@ class Transaction {
 enum TransactionType {
   payment,
   refund,
-  fee;
+  fee,
+  income,
+  expense;
 
   String get value {
     switch (this) {
@@ -65,6 +87,10 @@ enum TransactionType {
         return 'refund';
       case TransactionType.fee:
         return 'fee';
+      case TransactionType.income:
+        return 'income';
+      case TransactionType.expense:
+        return 'expense';
     }
   }
 
@@ -77,6 +103,10 @@ enum TransactionType {
         return TransactionType.refund;
       case 'fee':
         return TransactionType.fee;
+      case 'income':
+        return TransactionType.income;
+      case 'expense':
+        return TransactionType.expense;
       default:
         return null;
     }

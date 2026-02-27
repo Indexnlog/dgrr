@@ -17,26 +17,39 @@ final matchNotificationProvider = Provider<MatchNotificationService>((ref) {
   return MatchNotificationService();
 });
 
-/// 다가오는 경기 목록 실시간 스트림
+/// 매치 탭 노출 조건: attendees >= 7 AND opponent.status == confirmed
+/// (.cursorrules: 경기 카드는 성사된 경기만 표시)
+bool _shouldShowMatchCard(MatchModel m) {
+  final attendees = m.attendees?.length ?? 0;
+  final minPlayers = m.effectiveMinPlayers;
+  final opponentConfirmed = m.opponent?.isConfirmed == true;
+  return attendees >= minPlayers && opponentConfirmed;
+}
+
+/// 다가오는 경기 목록 실시간 스트림 (성사된 경기만 표시)
 final upcomingMatchesProvider = StreamProvider<List<MatchModel>>((ref) {
   final teamId = ref.watch(currentTeamIdProvider);
   if (teamId == null) return const Stream.empty();
 
   final ds = ref.watch(matchDataSourceProvider);
-  return ds.watchUpcomingMatches(teamId);
+  return ds.watchUpcomingMatches(teamId).map((list) =>
+      list.where(_shouldShowMatchCard).toList());
 });
 
-/// 오늘 경기 개수 (매치 탭 배지용)
-final todayMatchCountProvider = Provider<int>((ref) {
+/// 오늘 경기 또는 진행 중 경기 개수 (매치 탭 배지용)
+final todayOrLiveMatchCountProvider = Provider<int>((ref) {
   final matches = ref.watch(upcomingMatchesProvider).value ?? [];
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   return matches.where((m) {
+    // 진행 중 경기 포함
+    if (m.gameStatus == GameStatus.playing) return true;
     if (m.date == null) return false;
     final d = m.date!;
     return d.year == today.year && d.month == today.month && d.day == today.day;
   }).length;
 });
+
 
 /// 참석 투표 (트랜잭션 + 성사 시 Telegram 알림)
 Future<void> voteAttend(
@@ -112,6 +125,19 @@ Future<void> voteAbsentWithReason(
       opponentName: match.opponentName,
     );
   }
+}
+
+/// 공 가져가기 자원 토글 ("저도 들고가요")
+Future<void> toggleBallBringer(
+  WidgetRef ref,
+  Match match,
+  String uid,
+) async {
+  final teamId = ref.read(currentTeamIdProvider);
+  if (teamId == null) return;
+  await ref
+      .read(matchDataSourceProvider)
+      .toggleBallBringer(teamId, match.matchId, uid);
 }
 
 /// 샘플 경기 데이터 삽입 (에뮬레이터 테스트용)

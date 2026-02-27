@@ -85,9 +85,9 @@ class SchedulePage extends ConsumerWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppTheme.fixedBlue.withOpacity(0.15),
+                    color: AppTheme.fixedBlue.withValues(alpha:0.15),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.fixedBlue.withOpacity(0.3)),
+                    border: Border.all(color: AppTheme.fixedBlue.withValues(alpha:0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -98,6 +98,33 @@ class SchedulePage extends ConsumerWidget {
                         '예약 공지${noticeCount > 0 ? ' $noticeCount' : ''}',
                         style: const TextStyle(
                           color: AppTheme.fixedBlue,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => context.push('/schedule/polls'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.attendGreen.withValues(alpha:0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.attendGreen.withValues(alpha:0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(PhosphorIconsRegular.listChecks, color: AppTheme.attendGreen, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        '회비·출석 투표',
+                        style: const TextStyle(
+                          color: AppTheme.attendGreen,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -170,7 +197,7 @@ class SchedulePage extends ConsumerWidget {
           weekdayStyle: TextStyle(
               color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.w600),
           weekendStyle: TextStyle(
-              color: AppTheme.textMuted.withOpacity(0.7),
+              color: AppTheme.textMuted.withValues(alpha:0.7),
               fontSize: 12,
               fontWeight: FontWeight.w600),
         ),
@@ -374,7 +401,7 @@ class _MatchScheduleCard extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: attendCount >= minPlayers
-                    ? AppTheme.attendGreen.withOpacity(0.12)
+                    ? AppTheme.attendGreen.withValues(alpha:0.12)
                     : AppTheme.surface,
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -458,7 +485,7 @@ class _ClassScheduleCard extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: AppTheme.classBlue.withOpacity(0.12),
+                color: AppTheme.classBlue.withValues(alpha:0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(

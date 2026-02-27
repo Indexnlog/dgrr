@@ -73,8 +73,12 @@ class _PollDetailBody extends ConsumerStatefulWidget {
 }
 
 class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
-  bool _isVoting = false;
   bool _isCreating = false;
+  /// Optimistic UI: 탭 즉시 반영용
+  final Set<String> _optimisticVotes = {};
+  final Set<String> _optimisticUnvotes = {};
+  /// 옵션별 로딩: 저장 중인 옵션 ID
+  String? _votingOptionId;
 
   Future<void> _createEventsFromPoll() async {
     final poll = widget.poll;
@@ -132,15 +136,34 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
   Future<void> _toggleVote(String optionId, bool isVoted) async {
     final uid = ref.read(currentUserProvider)?.uid;
     final teamId = ref.read(currentTeamIdProvider);
-    if (uid == null || teamId == null || _isVoting) return;
+    if (uid == null || teamId == null) return;
 
-    setState(() => _isVoting = true);
+    // Optimistic UI: 바로 반영
+    setState(() {
+      if (isVoted) {
+        _optimisticUnvotes.add(optionId);
+        _optimisticVotes.remove(optionId);
+      } else {
+        _optimisticVotes.add(optionId);
+        _optimisticUnvotes.remove(optionId);
+        // 단일 선택: 기존 선택 제거
+        if (widget.poll.maxSelections == 1) {
+          for (final o in widget.poll.options ?? <PollOption>[]) {
+            if (o.id != optionId && (o.votes?.contains(uid) ?? false)) {
+              _optimisticUnvotes.add(o.id);
+              _optimisticVotes.remove(o.id);
+            }
+          }
+        }
+      }
+    });
+
+    setState(() => _votingOptionId = optionId);
     try {
       final ds = ref.read(pollDataSourceProvider);
       if (isVoted) {
         await ds.unvote(teamId, widget.poll.pollId, optionId, uid);
       } else {
-        // 단일 선택인 경우 기존 투표 먼저 취소
         if (widget.poll.maxSelections == 1) {
           for (final o in widget.poll.options ?? <PollOption>[]) {
             if (o.votes?.contains(uid) ?? false) {
@@ -150,7 +173,6 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
         }
         await ds.vote(teamId, widget.poll.pollId, optionId, uid);
 
-        // 월별 등록 투표인 경우 Registration에 반영
         if (widget.poll.category == PollCategory.membership &&
             widget.poll.targetMonth != null) {
           final status = MembershipStatus.fromString(optionId);
@@ -170,8 +192,22 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
           }
         }
       }
+      if (mounted) setState(() {
+        _optimisticVotes.clear();
+        _optimisticUnvotes.clear();
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _optimisticVotes.clear();
+          _optimisticUnvotes.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('투표 반영 실패: $e')),
+        );
+      }
     } finally {
-      if (mounted) setState(() => _isVoting = false);
+      if (mounted) setState(() => _votingOptionId = null);
     }
   }
 
@@ -207,7 +243,7 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: isActive
-                          ? _DS.attendGreen.withOpacity(0.15)
+                          ? _DS.attendGreen.withValues(alpha:0.15)
                           : _DS.surface,
                       borderRadius: BorderRadius.circular(6),
                     ),
@@ -251,15 +287,30 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
         const SizedBox(height: 16),
         // 옵션 목록
         ...options.map((option) {
-          final isVoted = option.votes?.contains(uid) ?? false;
-          final count = option.voteCount ?? 0;
-          final ratio = totalVotes > 0 ? count / totalVotes : 0.0;
-          final voters = option.votes ?? [];
+          final baseVoted = option.votes?.contains(uid) ?? false;
+          final isVoted = _optimisticUnvotes.contains(option.id)
+              ? false
+              : (_optimisticVotes.contains(option.id) || baseVoted);
+          final countDelta = (_optimisticVotes.contains(option.id) ? 1 : 0) -
+              (_optimisticUnvotes.contains(option.id) ? 1 : 0);
+          final count = (option.voteCount ?? 0) + countDelta;
+          final totalWithOptimistic =
+              totalVotes + _optimisticVotes.length - _optimisticUnvotes.length;
+          final ratio = totalWithOptimistic > 0 ? count / totalWithOptimistic : 0.0;
+          var voters = List<String>.from(option.votes ?? []);
+          if (uid != null &&
+              _optimisticVotes.contains(option.id) &&
+              !voters.contains(uid)) {
+            voters = [...voters, uid];
+          }
+          if (_optimisticUnvotes.contains(option.id)) {
+            voters = voters.where((v) => v != uid).toList();
+          }
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: GestureDetector(
-              onTap: isActive && !_isVoting
+              onTap: isActive && _votingOptionId != option.id
                   ? () => _toggleVote(option.id, isVoted)
                   : null,
               child: AnimatedContainer(
@@ -267,12 +318,12 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isVoted
-                      ? _DS.gold.withOpacity(0.08)
+                      ? _DS.gold.withValues(alpha:0.08)
                       : _DS.bgCard,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
                       color: isVoted
-                          ? _DS.gold.withOpacity(0.4)
+                          ? _DS.gold.withValues(alpha:0.4)
                           : _DS.divider,
                       width: isVoted ? 1.5 : 1),
                 ),
@@ -299,13 +350,26 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
                                       ? FontWeight.w700
                                       : FontWeight.w500)),
                         ),
-                        Text('$count명',
-                            style: TextStyle(
-                                color: isVoted
-                                    ? _DS.gold
-                                    : _DS.textMuted,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700)),
+                        if (_votingOptionId == option.id)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: _DS.gold,
+                              ),
+                            ),
+                          )
+                        else
+                          Text('$count명',
+                              style: TextStyle(
+                                  color: isVoted
+                                      ? _DS.gold
+                                      : _DS.textMuted,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700)),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -355,9 +419,9 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _DS.attendGreen.withOpacity(0.15),
+                color: _DS.attendGreen.withValues(alpha:0.15),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _DS.attendGreen.withOpacity(0.4)),
+                border: Border.all(color: _DS.attendGreen.withValues(alpha:0.4)),
               ),
               child: Row(
                 children: [

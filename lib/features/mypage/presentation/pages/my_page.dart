@@ -10,6 +10,7 @@ import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../registrations/data/models/registration_model.dart';
 import '../../../registrations/domain/entities/registration.dart';
 import '../../../registrations/presentation/providers/registration_providers.dart';
+import '../../../registrations/presentation/widgets/monthly_registration_vote_sheet.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_members_provider.dart';
 import '../providers/my_stats_provider.dart';
@@ -36,6 +37,8 @@ class MyPage extends ConsumerWidget {
             const SizedBox(height: 12),
             _buildProfileCard(context, ref, user),
             const SizedBox(height: 20),
+            _buildMonthlyVoteCard(context, ref, user, regsAsync),
+            const SizedBox(height: 20),
             _buildFeeStatusCard(regsAsync),
             const SizedBox(height: 20),
             _buildAttendanceCard(stats),
@@ -46,6 +49,124 @@ class MyPage extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMonthlyVoteCard(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic user,
+    AsyncValue<List<RegistrationModel>> regsAsync,
+  ) {
+    final seasonId = currentSeasonId;
+    final seasonLabel = _formatSeason(seasonId);
+
+    return regsAsync.when(
+      data: (regs) {
+        final myReg = regs
+            .where((r) => r.eventId == seasonId && r.userId == user?.uid)
+            .firstOrNull;
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppTheme.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.divider),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.how_to_vote, color: AppTheme.textSecondary, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$seasonLabel 등록',
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (myReg != null) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${myReg.membershipStatus?.label ?? '-'} ${myReg.membershipStatus?.monthlyFee != null && myReg.membershipStatus!.monthlyFee > 0 ? '${myReg.membershipStatus!.monthlyFee ~/ 10000}만' : '0'}',
+                              style: TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            myReg.status == RegistrationStatus.paid ? '납부완료' : '미납',
+                            style: TextStyle(
+                              color: myReg.status == RegistrationStatus.paid
+                                  ? AppTheme.accentGreen
+                                  : AppTheme.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isWithinRegistrationVotePeriod)
+                      TextButton(
+                        onPressed: () => showMonthlyRegistrationVoteSheet(context),
+                        child: const Text('변경', style: TextStyle(fontSize: 13)),
+                      ),
+                  ],
+                ),
+              ] else ...[
+                Text(
+                  isWithinRegistrationVotePeriod
+                      ? '이번 달 참가 여부를 선택해 주세요. (20~24일)'
+                      : '등록 투표 기간이 아닙니다 (매월 20~24일)',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: user?.uid != null && isWithinRegistrationVotePeriod
+                        ? () => showMonthlyRegistrationVoteSheet(context)
+                        : null,
+                    icon: const Icon(Icons.how_to_vote, size: 18),
+                    label: const Text('등록 투표하기'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.accentGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
@@ -122,7 +243,7 @@ class MyPage extends ConsumerWidget {
                         ),
                         decoration: BoxDecoration(
                           color: isPaid
-                              ? AppTheme.accentGreen.withOpacity(0.15)
+                              ? AppTheme.accentGreen.withValues(alpha:0.15)
                               : AppTheme.surface,
                           borderRadius: BorderRadius.circular(6),
                         ),

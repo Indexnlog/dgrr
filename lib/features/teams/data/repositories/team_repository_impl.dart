@@ -47,4 +47,18 @@ class TeamRepositoryImpl implements TeamRepository {
         .doc(memberId)
         .update({'photoUrl': photoUrl});
   }
+
+  @override
+  Future<void> updateMemberFcmToken({
+    required String teamId,
+    required String memberId,
+    required String? fcmToken,
+  }) async {
+    await firestore
+        .collection('teams')
+        .doc(teamId)
+        .collection('members')
+        .doc(memberId)
+        .set({'fcmToken': fcmToken}, SetOptions(merge: true));
+  }
 }

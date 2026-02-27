@@ -195,7 +195,7 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
                             horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? _DS.teamRed.withOpacity(0.2)
+                              ? _DS.teamRed.withValues(alpha:0.2)
                               : _DS.surface,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
@@ -279,6 +279,8 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
         attendees.where((a) => a.status == AttendeeStatus.attending).toList();
     final late_ =
         attendees.where((a) => a.status == AttendeeStatus.late).toList();
+    final attended =
+        attendees.where((a) => a.status == AttendeeStatus.attended).toList();
     final absent =
         attendees.where((a) => a.status == AttendeeStatus.absent).toList();
 
@@ -287,17 +289,21 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
       children: [
         _buildInfoCard(event),
         const SizedBox(height: 16),
-        _buildAttendanceSummary(attending.length, late_.length, absent.length),
+        _buildAttendanceSummary(
+          isFinished ? attended.length : attending.length,
+          isFinished ? 0 : late_.length,
+          absent.length,
+        ),
         const SizedBox(height: 16),
         if (!isFinished) ...[
           _buildVoteButtons(myStatus),
           const SizedBox(height: 20),
         ],
-        _buildAttendeeSection('참석', attending, _DS.attendGreen),
-        if (late_.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _buildAttendeeSection('지각', late_, _DS.gold),
-        ],
+        _buildAttendeeSection(
+          isFinished ? '출석' : '참석',
+          [...attending, ...late_, ...attended],
+          _DS.attendGreen,
+        ),
         if (absent.isNotEmpty) ...[
           const SizedBox(height: 12),
           _buildAttendeeSection('불참', absent, _DS.absentRed),
@@ -344,7 +350,7 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _DS.fixedBlue.withOpacity(0.15),
+                  color: _DS.fixedBlue.withValues(alpha:0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text('수업',
@@ -459,9 +465,9 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withOpacity(0.25), width: 0.5),
+                border: Border.all(color: color.withValues(alpha:0.25), width: 0.5),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -469,7 +475,7 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
                   if (a.number != null) ...[
                     Text('#${a.number}',
                         style: TextStyle(
-                            color: color.withOpacity(0.7),
+                            color: color.withValues(alpha:0.7),
                             fontSize: 10,
                             fontWeight: FontWeight.w700)),
                     const SizedBox(width: 4),
@@ -514,7 +520,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha:0.15),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(label,

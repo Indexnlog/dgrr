@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../domain/repositories/storage_repository.dart';
 import '../datasources/storage_remote_data_source.dart';
 

@@ -139,7 +139,7 @@ class _ReservationNoticeDetailPageState
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _DS.teamRed.withOpacity(0.2),
+                        color: _DS.teamRed.withValues(alpha:0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -229,9 +229,9 @@ class _ReservationNoticeDetailPageState
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSuccess
-                ? _DS.attendGreen.withOpacity(0.4)
+                ? _DS.attendGreen.withValues(alpha:0.4)
                 : isFailed
-                    ? _DS.absentRed.withOpacity(0.4)
+                    ? _DS.absentRed.withValues(alpha:0.4)
                     : _DS.divider,
           ),
         ),
@@ -369,9 +369,9 @@ class _ReservationNoticeDetailPageState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _DS.gold.withOpacity(0.1),
+        color: _DS.gold.withValues(alpha:0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _DS.gold.withOpacity(0.3)),
+        border: Border.all(color: _DS.gold.withValues(alpha:0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
