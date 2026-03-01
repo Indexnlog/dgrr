@@ -32,11 +32,12 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
       body: SafeArea(
+        top: false, // MainShell AppTopBar 아래라 상단 패딩 불필요
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
               child: Row(
                 children: [
                   const Text(
@@ -84,15 +85,25 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
                       : matches.where((m) =>
                           (m.opponentName ?? '').toLowerCase().contains(_searchQuery)).toList();
                   if (filtered.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        ref.invalidate(upcomingMatchesProvider);
+                      },
+                      color: AppTheme.teamRed,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
                         children: [
-                          Icon(PhosphorIconsRegular.soccerBall, size: 56, color: AppTheme.textMuted.withValues(alpha: 0.4)),
-                          const SizedBox(height: 12),
-                          Text(
-                            _searchQuery.isEmpty ? '예정된 매치가 없습니다' : '검색 결과가 없습니다',
-                            style: const TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(PhosphorIconsRegular.soccerBall, size: 56, color: AppTheme.textMuted.withValues(alpha: 0.4)),
+                              const SizedBox(height: 12),
+                              Text(
+                                _searchQuery.isEmpty ? '예정된 매치가 없습니다' : '검색 결과가 없습니다',
+                                style: const TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                              ),
+                            ],
                           ),
                         ],
                       ),

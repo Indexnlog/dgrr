@@ -61,29 +61,27 @@ class ReservationNoticeListPage extends ConsumerWidget {
           if (notices.isEmpty) {
             return RefreshIndicator(
               onRefresh: () async => ref.invalidate(upcomingReservationNoticesProvider),
-              child: SingleChildScrollView(
+              child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height - 200,
-                  child: Center(
-                    child: Column(
-                mainAxisSize: MainAxisSize.min,
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 80),
                 children: [
-                  Icon(Icons.sports_soccer, color: _DS.textMuted, size: 48),
-                  const SizedBox(height: 12),
-                  Text(
-                    '예정된 예약 공지가 없습니다',
-                    style: TextStyle(color: _DS.textSecondary, fontSize: 15),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '수업관리팀이 예약 공지를 만들면 여기에 표시됩니다',
-                    style: TextStyle(color: _DS.textMuted, fontSize: 13),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.sports_soccer, color: _DS.textMuted, size: 48),
+                      const SizedBox(height: 12),
+                      Text(
+                        '예정된 예약 공지가 없습니다',
+                        style: TextStyle(color: _DS.textSecondary, fontSize: 15),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '수업관리팀이 예약 공지를 만들면 여기에 표시됩니다',
+                        style: TextStyle(color: _DS.textMuted, fontSize: 13),
+                      ),
+                    ],
                   ),
                 ],
-                    ),
-                  ),
-                ),
               ),
             );
           }
@@ -91,7 +89,7 @@ class ReservationNoticeListPage extends ConsumerWidget {
             onRefresh: () async => ref.invalidate(upcomingReservationNoticesProvider),
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             itemCount: notices.length,
             itemBuilder: (context, index) {
               final notice = notices[index];

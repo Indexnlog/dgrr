@@ -58,7 +58,7 @@ class FeeManagementPage extends ConsumerWidget {
       body: feesAsync.when(
         data: (fees) {
           return ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             children: [
               _NextMonthRegistrationDraftCard(),
               const SizedBox(height: 16),

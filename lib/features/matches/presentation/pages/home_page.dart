@@ -74,6 +74,7 @@ class _HomePageState extends ConsumerState<HomePage>
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
       body: SafeArea(
+        top: false, // MainShell AppTopBar 아래라 상단 패딩 불필요
         child: matchesAsync.when(
           data: (matches) {
             final canManagePosts =
@@ -123,17 +124,19 @@ class _HomePageState extends ConsumerState<HomePage>
                     child: _buildMatchSearchBar(),
                   ),
                 if (filteredMatches.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: Text(
-                        matches.isEmpty
-                            ? '예정된 경기가 없습니다'
-                            : '검색 결과가 없습니다',
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 16,
-                          letterSpacing: 0.5,
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+                      child: Center(
+                        child: Text(
+                          matches.isEmpty
+                              ? '예정된 경기가 없습니다'
+                              : '검색 결과가 없습니다',
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 16,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),
@@ -203,7 +206,7 @@ class _HomePageState extends ConsumerState<HomePage>
     final dateStr = '${now.month}월 ${now.day}일 ${_weekdayFull(now.weekday)}';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

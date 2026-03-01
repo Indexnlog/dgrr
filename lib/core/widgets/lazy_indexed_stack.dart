@@ -39,7 +39,9 @@ class _LazyIndexedStackState extends State<LazyIndexedStack> {
     final children = <Widget>[];
     for (var i = 0; i < widget.children.length; i++) {
       children.add(
-        _visitedIndices.contains(i) ? widget.children[i] : const SizedBox.shrink(),
+        _visitedIndices.contains(i)
+            ? SizedBox.expand(child: widget.children[i])
+            : const SizedBox.shrink(),
       );
     }
     return IndexedStack(

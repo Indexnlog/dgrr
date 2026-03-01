@@ -34,10 +34,10 @@ final signInAnonymouslyProvider = Provider<Future<UserCredential> Function()>((r
 });
 
 /// 로그아웃 Provider
-final signOutProvider = Provider<void Function()>((ref) {
+final signOutProvider = Provider<Future<void> Function()>((ref) {
   final auth = FirebaseAuth.instance;
   final googleSignIn = GoogleSignIn.instance;
-  
+
   return () async {
     await Future.wait([
       auth.signOut(),

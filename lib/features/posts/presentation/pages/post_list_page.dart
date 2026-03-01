@@ -59,24 +59,22 @@ class PostListPage extends ConsumerWidget {
           if (posts.isEmpty) {
             return RefreshIndicator(
               onRefresh: () async => ref.invalidate(recentPostsProvider),
-              child: SingleChildScrollView(
+              child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height - 200,
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.campaign_outlined, color: _DS.textMuted, size: 48),
-                        const SizedBox(height: 12),
-                        Text(
-                          '등록된 공지가 없습니다',
-                          style: TextStyle(color: _DS.textSecondary, fontSize: 15),
-                        ),
-                      ],
-                    ),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
+                children: [
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.campaign_outlined, color: _DS.textMuted, size: 48),
+                      const SizedBox(height: 12),
+                      Text(
+                        '등록된 공지가 없습니다',
+                        style: TextStyle(color: _DS.textSecondary, fontSize: 15),
+                      ),
+                    ],
                   ),
-                ),
+                ],
               ),
             );
           }
@@ -84,7 +82,7 @@ class PostListPage extends ConsumerWidget {
             onRefresh: () async => ref.invalidate(recentPostsProvider),
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             itemCount: posts.length,
             itemBuilder: (context, index) {
               final post = posts[index];

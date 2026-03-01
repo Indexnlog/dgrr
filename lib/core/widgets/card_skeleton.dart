@@ -14,6 +14,7 @@ class CardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = height < 120;
     return Container(
       height: height,
       decoration: BoxDecoration(
@@ -22,19 +23,29 @@ class CardSkeleton extends StatelessWidget {
         border: Border.all(color: AppTheme.divider),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ShimmerLine(width: 120, height: 16),
-            const SizedBox(height: 12),
-            _ShimmerLine(width: double.infinity, height: 12),
-            const SizedBox(height: 8),
-            _ShimmerLine(width: 200, height: 12),
-            const Spacer(),
-            _ShimmerLine(width: 80, height: 10),
-          ],
-        ),
+        padding: EdgeInsets.all(isCompact ? 12 : 20),
+        child: isCompact
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ShimmerLine(width: 100, height: 12),
+                  const SizedBox(height: 8),
+                  _ShimmerLine(width: double.infinity, height: 10),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ShimmerLine(width: 120, height: 16),
+                  const SizedBox(height: 12),
+                  _ShimmerLine(width: double.infinity, height: 12),
+                  const SizedBox(height: 8),
+                  _ShimmerLine(width: 200, height: 12),
+                  const Spacer(),
+                  _ShimmerLine(width: 80, height: 10),
+                ],
+              ),
       ),
     );
   }

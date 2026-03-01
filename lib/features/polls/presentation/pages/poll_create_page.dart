@@ -84,7 +84,7 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
         elevation: 0,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
           _buildSectionTitle('투표 유형'),
           const SizedBox(height: 8),

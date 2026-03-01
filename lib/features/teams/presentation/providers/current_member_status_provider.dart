@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../auth/presentation/providers/auth_state_provider.dart';
-import '../../../domain/entities/member.dart';
+import '../../domain/entities/member.dart';
 import 'current_team_provider.dart';
 
 /// 현재 사용자의 현재 팀 내 멤버 상태 (pending/active/rejected 등)

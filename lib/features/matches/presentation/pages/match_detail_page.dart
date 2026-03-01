@@ -97,7 +97,7 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
   Widget _buildBody(Match match, AsyncValue<List<Round>> roundsAsync) {
     final daysUntil = _daysUntil(match);
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
       children: [
         if (daysUntil != null && daysUntil >= 0) ...[
           _DDayBanner(daysUntil: daysUntil),

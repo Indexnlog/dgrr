@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../features/auth/domain/repositories/auth_repository.dart'
     show AuthCanceledException;
 import '../../../features/auth/presentation/providers/auth_providers.dart';
+import '../../admin_config.dart';
 
 /// 어드민 로그인 (구글)
 class AdminLoginPage extends ConsumerStatefulWidget {
@@ -27,6 +29,16 @@ class _AdminLoginPageState extends ConsumerState<AdminLoginPage> {
     try {
       final signIn = ref.read(signInWithGoogleProvider);
       await signIn.call();
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user?.email == null ||
+          !adminAllowedEmails.any((e) => e == user!.email)) {
+        await FirebaseAuth.instance.signOut();
+        if (mounted) {
+          setState(() => _error = '접근 권한이 없습니다. 허용된 관리자만 로그인할 수 있습니다.');
+        }
+        return;
+      }
 
       if (mounted) context.go('/admin');
     } on AuthCanceledException {

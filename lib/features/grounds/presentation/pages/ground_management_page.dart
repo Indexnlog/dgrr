@@ -63,26 +63,30 @@ class GroundManagementPage extends ConsumerWidget {
       body: groundsAsync.when(
         data: (grounds) {
           if (grounds.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.stadium_outlined,
-                      size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
-                  const SizedBox(height: 12),
-                  Text('등록된 구장이 없습니다',
-                      style: TextStyle(color: _DS.textMuted, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Text(
-                    '운영진이 구장을 등록해 주세요',
-                    style: TextStyle(color: _DS.textMuted, fontSize: 12),
-                  ),
-                ],
-              ),
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
+              children: [
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.stadium_outlined,
+                        size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
+                    const SizedBox(height: 12),
+                    Text('등록된 구장이 없습니다',
+                        style: TextStyle(color: _DS.textMuted, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    Text(
+                      '운영진이 구장을 등록해 주세요',
+                      style: TextStyle(color: _DS.textMuted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             itemCount: grounds.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (_, index) => _GroundCard(

@@ -70,6 +70,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '27853679688',
     projectId: 'dgrr-app',
     storageBucket: 'dgrr-app.firebasestorage.app',
+    androidClientId: '27853679688-0daieb8lsc16bgvonatqfqagprtu7nq3.apps.googleusercontent.com',
     iosClientId: '27853679688-moninv9l2k9vuhcb0eghgqkgkb4rb7nn.apps.googleusercontent.com',
     iosBundleId: 'com.example.dgrrApp',
   );

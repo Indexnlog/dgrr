@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -30,8 +31,15 @@ class _OfflineBannerState extends State<OfflineBanner> {
   }
 
   void _updateStatus(List<ConnectivityResult> results) {
-    final offline = results.isEmpty ||
+    var offline = results.isEmpty ||
         results.every((r) => r == ConnectivityResult.none);
+
+    // connectivity_plus 알려진 이슈: iOS 시뮬레이터에서 잘못 "none" 반환.
+    // 개발/프로파일 모드에서는 배너 숨김 (릴리즈에서만 표시).
+    if (!kReleaseMode) {
+      offline = false;
+    }
+
     if (mounted && _isOffline != offline) {
       setState(() => _isOffline = offline);
     }

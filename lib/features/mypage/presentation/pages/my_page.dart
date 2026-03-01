@@ -32,27 +32,27 @@ class MyPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
       body: SafeArea(
+        top: false, // MainShell AppTopBar 아래라 상단 패딩 불필요
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
-            const SizedBox(height: 12),
             _buildProfileCard(context, ref, user),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             _buildMonthlyVoteCard(context, ref, user, regsAsync),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             _buildFeeStatusCard(regsAsync),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             if (classStats.total > 0) ...[
               _buildClassAttendanceCard(classStats),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
             ],
             _buildAttendanceCard(stats),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             _buildMatchPerformanceCard(context, ref, user?.uid),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             _buildMenuSection(context, ref),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             _buildLogout(ref),
           ],
         ),

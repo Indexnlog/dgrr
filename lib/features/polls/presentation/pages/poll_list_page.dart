@@ -51,23 +51,21 @@ class PollListPage extends ConsumerWidget {
           if (polls.isEmpty) {
             return RefreshIndicator(
               onRefresh: () async => ref.invalidate(allPollsProvider),
-              child: SingleChildScrollView(
+              child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                child: SizedBox(
-                  height: MediaQuery.of(context).size.height - 200,
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.ballot_outlined,
-                            size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
-                        const SizedBox(height: 12),
-                        Text('아직 투표가 없습니다',
-                            style: TextStyle(color: _DS.textMuted, fontSize: 14)),
-                      ],
-                    ),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
+                children: [
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.ballot_outlined,
+                          size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
+                      const SizedBox(height: 12),
+                      Text('아직 투표가 없습니다',
+                          style: TextStyle(color: _DS.textMuted, fontSize: 14)),
+                    ],
                   ),
-                ),
+                ],
               ),
             );
           }
@@ -75,7 +73,7 @@ class PollListPage extends ConsumerWidget {
             onRefresh: () async => ref.invalidate(allPollsProvider),
             child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
             itemCount: polls.length,
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) =>

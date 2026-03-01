@@ -27,6 +27,7 @@ import '../../features/polls/presentation/pages/poll_list_page.dart';
 import '../../features/posts/presentation/pages/post_create_page.dart';
 import '../../features/posts/presentation/pages/post_detail_page.dart';
 import '../../features/posts/presentation/pages/post_list_page.dart';
+import '../../features/notifications/presentation/pages/notification_list_page.dart';
 import '../../features/reservations/presentation/pages/reservation_notice_create_page.dart';
 import '../../features/reservations/presentation/pages/reservation_notice_detail_page.dart';
 import '../../features/reservations/presentation/pages/reservation_notice_list_page.dart';
@@ -134,6 +135,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         ],
                       ),
                     ],
+                  ),
+                  GoRoute(
+                    path: 'notifications',
+                    name: 'notification-list',
+                    builder: (context, state) =>
+                        const NotificationListPage(),
                   ),
                 ],
               ),

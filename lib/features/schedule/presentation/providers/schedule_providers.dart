@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../events/data/models/event_model.dart';
 import '../../../events/domain/entities/event.dart';
 import '../../../events/presentation/providers/event_providers.dart';
@@ -71,30 +72,41 @@ String _dateStr(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
 /// 캘린더 마커용 통합 일정 아이템
+/// [isUserParticipating] true=참여, false=비참여, null=미투표
 class ScheduleItem {
-  const ScheduleItem({required this.type, this.match, this.event});
+  const ScheduleItem({
+    required this.type,
+    this.match,
+    this.event,
+    this.isUserParticipating,
+  });
   final String type; // 'match' | 'class'
   final Match? match;
   final Event? event;
+  final bool? isUserParticipating;
 
   String get id =>
       type == 'match' ? match!.matchId : event!.eventId;
 }
 
-/// 날짜 → 통합 일정 맵 (매치 + 수업)
+/// 날짜 → 통합 일정 맵 (매치 + 수업, 참여 여부 포함)
 final scheduleByDateProvider =
     Provider<Map<DateTime, List<ScheduleItem>>>((ref) {
   final matches = ref.watch(monthlyMatchesProvider).value ?? [];
   final classes = ref.watch(monthlyClassesForCalendarProvider).value ?? [];
-
+  final uid = ref.watch(currentUserProvider)?.uid;
   final map = <DateTime, List<ScheduleItem>>{};
 
   for (final m in matches) {
     if (m.date == null) continue;
     final key = DateUtils.dateOnly(m.date!);
-    map
-        .putIfAbsent(key, () => [])
-        .add(ScheduleItem(type: 'match', match: m));
+    final isParticipating =
+        uid != null && (m.attendees?.contains(uid) ?? false);
+    map.putIfAbsent(key, () => []).add(ScheduleItem(
+          type: 'match',
+          match: m,
+          isUserParticipating: isParticipating,
+        ));
   }
 
   for (final c in classes) {
@@ -107,9 +119,20 @@ final scheduleByDateProvider =
       int.parse(parts[2]),
     );
     final key = DateUtils.dateOnly(dt);
-    map
-        .putIfAbsent(key, () => [])
-        .add(ScheduleItem(type: 'class', event: c));
+    bool? isParticipating;
+    if (uid != null && (c.attendees?.isNotEmpty ?? false)) {
+      final myAttendee =
+          c.attendees!.where((a) => a.userId == uid).firstOrNull;
+      isParticipating = myAttendee != null &&
+          (myAttendee.status == AttendeeStatus.attending ||
+              myAttendee.status == AttendeeStatus.late ||
+              myAttendee.status == AttendeeStatus.attended);
+    }
+    map.putIfAbsent(key, () => []).add(ScheduleItem(
+          type: 'class',
+          event: c,
+          isUserParticipating: isParticipating,
+        ));
   }
 
   return map;

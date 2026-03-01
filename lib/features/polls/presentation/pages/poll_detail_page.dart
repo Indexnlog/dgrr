@@ -226,7 +226,7 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
     final isMultiSelect = (poll.maxSelections ?? 0) != 1;
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
       children: [
         // 제목 카드
         Container(

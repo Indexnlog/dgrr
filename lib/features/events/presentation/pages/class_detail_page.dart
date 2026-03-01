@@ -286,7 +286,7 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
         attendees.where((a) => a.status == AttendeeStatus.absent).toList();
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
       children: [
         _buildInfoCard(event),
         const SizedBox(height: 16),

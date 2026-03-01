@@ -25,6 +25,7 @@ class SchedulePage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
       body: SafeArea(
+        top: false, // MainShell AppTopBar 아래라 상단 패딩 불필요
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(monthlyMatchesProvider);
@@ -39,22 +40,30 @@ class SchedulePage extends ConsumerWidget {
             SliverToBoxAdapter(child: _buildCalendar(ref, focusedMonth, selectedDate, scheduleByDate)),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
             if (selectedSchedule.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _buildEmpty(selectedDate),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+                  child: _buildEmpty(selectedDate),
+                ),
               )
             else
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                 sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
+                    delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final item = selectedSchedule[index];
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: item.type == 'match'
-                            ? _MatchScheduleCard(match: item.match!)
-                            : _ClassScheduleCard(event: item.event!),
+                            ? _MatchScheduleCard(
+                                match: item.match!,
+                                isUserParticipating: item.isUserParticipating,
+                              )
+                            : _ClassScheduleCard(
+                                event: item.event!,
+                                isUserParticipating: item.isUserParticipating,
+                              ),
                       );
                     },
                     childCount: selectedSchedule.length,
@@ -149,6 +158,10 @@ class SchedulePage extends ConsumerWidget {
               _LegendDot(color: AppTheme.gold, label: '매치'),
               const SizedBox(width: 12),
               _LegendDot(color: AppTheme.classBlue, label: '수업'),
+              const SizedBox(width: 12),
+              _LegendDot(color: AppTheme.attendGreen, label: '참여'),
+              const SizedBox(width: 12),
+              _LegendDot(color: AppTheme.textMuted, label: '비참여'),
             ],
           ),
         ],
@@ -281,9 +294,18 @@ class SchedulePage extends ConsumerWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: events.take(3).map((item) {
-                  final color = item.type == 'class'
-                      ? AppTheme.classBlue
-                      : _matchMarkerColor(item.match?.status);
+                  Color color;
+                  if (item.type == 'class') {
+                    color = item.isUserParticipating == true
+                        ? AppTheme.attendGreen
+                        : item.isUserParticipating == false
+                            ? AppTheme.textMuted
+                            : AppTheme.classBlue;
+                  } else {
+                    color = item.isUserParticipating == true
+                        ? AppTheme.attendGreen
+                        : _matchMarkerColor(item.match?.status);
+                  }
                   return Container(
                     width: 6,
                     height: 6,
@@ -345,8 +367,12 @@ class SchedulePage extends ConsumerWidget {
 // ── 매치 카드 ──
 
 class _MatchScheduleCard extends StatelessWidget {
-  const _MatchScheduleCard({required this.match});
+  const _MatchScheduleCard({
+    required this.match,
+    this.isUserParticipating,
+  });
   final Match match;
+  final bool? isUserParticipating;
 
   @override
   Widget build(BuildContext context) {
@@ -367,12 +393,18 @@ class _MatchScheduleCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // 타입 표시
+            // 타입·참여 표시 (참여=초록, 비참여=회색, 미정=금색)
             Container(
               width: 4,
               height: 44,
               decoration: BoxDecoration(
-                  color: AppTheme.gold, borderRadius: BorderRadius.circular(2)),
+                color: isUserParticipating == true
+                    ? AppTheme.attendGreen
+                    : isUserParticipating == false
+                        ? AppTheme.textMuted
+                        : AppTheme.gold,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             const SizedBox(width: 14),
             // 시간
@@ -433,8 +465,12 @@ class _MatchScheduleCard extends StatelessWidget {
 // ── 수업 카드 ──
 
 class _ClassScheduleCard extends StatelessWidget {
-  const _ClassScheduleCard({required this.event});
+  const _ClassScheduleCard({
+    required this.event,
+    this.isUserParticipating,
+  });
   final Event event;
+  final bool? isUserParticipating;
 
   @override
   Widget build(BuildContext context) {
@@ -453,12 +489,18 @@ class _ClassScheduleCard extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // 참여=초록, 비참여=회색, 미투표=파랑
             Container(
               width: 4,
               height: 44,
               decoration: BoxDecoration(
-                  color: AppTheme.classBlue,
-                  borderRadius: BorderRadius.circular(2)),
+                color: isUserParticipating == true
+                    ? AppTheme.attendGreen
+                    : isUserParticipating == false
+                        ? AppTheme.textMuted
+                        : AppTheme.classBlue,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             const SizedBox(width: 14),
             SizedBox(

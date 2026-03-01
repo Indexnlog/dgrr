@@ -78,25 +78,29 @@ class _OpponentListPageState extends ConsumerState<OpponentListPage> {
                         (o.name ?? '').toLowerCase().contains(_searchQuery) ||
                         (o.contact ?? '').toLowerCase().contains(_searchQuery)).toList();
                 if (filtered.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.groups_outlined, size: 56, color: _C.muted.withValues(alpha: 0.5)),
-                  const SizedBox(height: 16),
-                  Text(
-                    _searchQuery.isEmpty ? '등록된 상대팀이 없습니다' : '검색 결과가 없습니다',
-                    style: TextStyle(color: _C.muted, fontSize: 14),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '경기 생성 시 상대팀을 입력하면 자동 등록됩니다',
-                    style: TextStyle(color: _C.muted.withValues(alpha: 0.8), fontSize: 12),
-                  ),
-                ],
-              ),
-            );
-          }
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.groups_outlined, size: 56, color: _C.muted.withValues(alpha: 0.5)),
+                          const SizedBox(height: 16),
+                          Text(
+                            _searchQuery.isEmpty ? '등록된 상대팀이 없습니다' : '검색 결과가 없습니다',
+                            style: TextStyle(color: _C.muted, fontSize: 14),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '경기 생성 시 상대팀을 입력하면 자동 등록됩니다',
+                            style: TextStyle(color: _C.muted.withValues(alpha: 0.8), fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
                 return ListView.separated(
                   padding: const EdgeInsets.all(20),
                   itemCount: filtered.length,
