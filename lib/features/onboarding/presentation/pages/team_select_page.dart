@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/providers/firebase_ready_provider.dart';
+import '../../../../core/utils/navigate_admin_stub.dart'
+    if (dart.library.html) '../../../../core/utils/navigate_admin_web.dart' as nav_admin;
+import '../../../../core/theme/app_theme.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
@@ -12,6 +16,9 @@ import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_providers.dart';
 import '../../domain/entities/public_team.dart';
 import '../providers/public_teams_provider.dart';
+
+/// 일단 우리팀(영원FC)만 노출 (다른 팀은 허위 데이터)
+const _ourTeamId = 'youngwon_fc';
 
 class TeamSelectPage extends ConsumerStatefulWidget {
   const TeamSelectPage({super.key});
@@ -269,33 +276,67 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
     final firebaseReady = ref.watch(firebaseReadyProvider);
 
     return Scaffold(
+      backgroundColor: AppTheme.bgDeep,
       appBar: AppBar(
-        title: const Text('팀 선택'),
+        backgroundColor: AppTheme.primaryBlue,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          '팀 선택',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         actions: [
           TextButton.icon(
             onPressed: () => context.push('/welcome'),
-            icon: const Icon(Icons.menu_book, size: 18),
-            label: const Text('영원FC 안내'),
+            icon: Icon(Icons.menu_book, size: 18, color: Colors.white.withValues(alpha: 0.9)),
+            label: Text(
+              '영원FC 안내',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
+            ),
           ),
-          if (kDebugMode)
+          if (kDebugMode && kIsWeb) ...[
+            TextButton.icon(
+              onPressed: () => nav_admin.navigateToAdmin(),
+              icon: Icon(Icons.admin_panel_settings, size: 18, color: Colors.white.withValues(alpha: 0.9)),
+              label: Text(
+                '어드민',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
+              ),
+            ),
             TextButton.icon(
               onPressed: _isSigningIn ? null : _handleDebugLogin,
-              icon: const Icon(Icons.bug_report, size: 18),
-              label: const Text('테스트 로그인'),
+              icon: Icon(Icons.bug_report, size: 18, color: Colors.white.withValues(alpha: 0.9)),
+              label: Text(
+                '테스트 로그인',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
+              ),
             ),
+          ],
         ],
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
             child: TextField(
               controller: _searchController,
               onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
               decoration: InputDecoration(
                 hintText: '팀명, 지역으로 검색',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                prefixIcon: Icon(Icons.search, color: AppTheme.textMuted, size: 20),
+                filled: true,
+                fillColor: AppTheme.bgCard,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 isDense: true,
               ),
             ),
@@ -306,7 +347,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                 if (!firebaseReady)
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                       child: _FirebaseNoticeCard(
                         onTap: () => _showSnackBar('Firebase 설정을 완료해 주세요.'),
                       ),
@@ -314,20 +355,22 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                   ),
                 userTeamsAsync.when(
                   data: (myTeams) {
-                    if (myTeams.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+                    final ourTeams = myTeams.where((t) => t.id == _ourTeamId).toList();
+                    if (ourTeams.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
                     return SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                       sliver: SliverList(
                         delegate: SliverChildListDelegate([
                           Text(
                             '내가 속한 팀',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            style: const TextStyle(
+                              color: AppTheme.primaryBlue,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                           const SizedBox(height: 8),
-                          ...myTeams.map((team) => Padding(
+                          ...ourTeams.map((team) => Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: _TeamCard(
                                   team: team,
@@ -347,21 +390,24 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
                     child: Text(
                       '참여 가능한 팀',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      style: const TextStyle(
+                        color: AppTheme.primaryBlue,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
                 teamsAsync.when(
                   data: (teams) {
+                    // 일단 우리팀만 노출
+                    final ourTeamList = teams.where((t) => t.id == _ourTeamId).toList();
                     final filtered = _searchQuery.isEmpty
-                        ? teams
-                        : teams.where((t) =>
+                        ? ourTeamList
+                        : ourTeamList.where((t) =>
                             t.name.toLowerCase().contains(_searchQuery) ||
                             t.region.toLowerCase().contains(_searchQuery) ||
                             t.intro.toLowerCase().contains(_searchQuery)).toList();
@@ -371,7 +417,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                           final team = filtered[index];
                           final isSelected = _selectedTeamId == team.id;
                           return Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                             child: _TeamCard(
                               team: team,
                               isSelected: isSelected,
@@ -388,11 +434,16 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                     );
                   },
                   loading: () => const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(
+                      child: CircularProgressIndicator(color: AppTheme.primaryBlue, strokeWidth: 2.5),
+                    ),
                   ),
                   error: (_, __) => const SliverFillRemaining(
                     child: Center(
-                      child: Text('팀 목록을 불러오는 중 문제가 발생했습니다.'),
+                      child: Text(
+                        '팀 목록을 불러오는 중 문제가 발생했습니다.',
+                        style: TextStyle(color: AppTheme.textSecondary),
+                      ),
                     ),
                   ),
                 ),
@@ -414,29 +465,82 @@ class _FirebaseNoticeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      color: colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.fixedBlue.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.fixedBlue.withValues(alpha: 0.3)),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.info_outline, color: colorScheme.primary),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Firebase 설정이 아직 완료되지 않았습니다. '
-                  '설정 후 구글 로그인을 사용할 수 있어요.',
-                  style: Theme.of(context).textTheme.bodyMedium,
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: AppTheme.fixedBlue, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Firebase 설정이 아직 완료되지 않았습니다. '
+                '설정 후 구글 로그인을 사용할 수 있어요.',
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 14,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamLogo extends StatelessWidget {
+  const _TeamLogo({required this.team});
+  final PublicTeam team;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasRemoteLogo = team.logoUrl.isNotEmpty;
+    final useAssetLogo = !hasRemoteLogo && team.id == _ourTeamId;
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: !hasRemoteLogo && !useAssetLogo
+            ? AppTheme.primaryBlue.withValues(alpha: 0.15)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: hasRemoteLogo
+          ? CachedNetworkImage(
+              imageUrl: team.logoUrl,
+              fit: BoxFit.cover,
+              errorWidget: (_, __, ___) => _buildFallback(),
+            )
+              : useAssetLogo
+              ? Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Image.asset(
+                    'assets/images/logo_frfc.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => _buildFallback(),
+                  ),
+                )
+              : _buildFallback(),
+    );
+  }
+
+  Widget _buildFallback() {
+    return Center(
+      child: Text(
+        team.name.isNotEmpty ? team.name.substring(0, 1) : '팀',
+        style: const TextStyle(
+          color: AppTheme.primaryBlue,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -462,68 +566,100 @@ class _TeamCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isSelected ? colorScheme.primary : Colors.transparent,
-          width: 1.5,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isSelected ? AppTheme.primaryBlue : AppTheme.divider,
+          width: isSelected ? 1.5 : 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      elevation: 2,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: colorScheme.primaryContainer,
-                    child: Text(
-                      team.name.isNotEmpty ? team.name.substring(0, 1) : '팀',
-                      style: TextStyle(color: colorScheme.onPrimaryContainer),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _TeamLogo(team: team),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        team.name,
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      team.name,
-                      style: Theme.of(context).textTheme.titleMedium,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        team.region,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
-                  Chip(
-                    label: Text(team.region),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                team.intro,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 12),
-              if (onEnter != null || onJoin != null)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton(
-                    onPressed: onEnter ?? (isSigningIn ? null : onJoin),
-                    child: isSigningIn && onJoin != null
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(onEnter != null ? '들어가기' : '참여하기'),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  team.intro,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 14,
                   ),
                 ),
-            ],
+                if (onEnter != null || onJoin != null) ...[
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton(
+                      onPressed: onEnter ?? (isSigningIn ? null : onJoin),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.accentGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: isSigningIn && onJoin != null
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(onEnter != null ? '들어가기' : '참여하기'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),

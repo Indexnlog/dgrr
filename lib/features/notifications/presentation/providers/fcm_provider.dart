@@ -1,7 +1,7 @@
-import 'dart:io';
-
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+// 웹에서는 dart:io 사용 불가 → 스텁 사용
+import 'platform_stub.dart' if (dart.library.io) 'dart:io' as io;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/router/app_router.dart';
@@ -41,8 +41,8 @@ class FcmService {
       return;
     }
 
-    // 포그라운드 메시지 표시 설정 (iOS)
-    if (Platform.isIOS) {
+    // 포그라운드 메시지 표시 설정 (iOS만, 웹에서는 Platform 사용 불가)
+    if (!kIsWeb && io.Platform.isIOS) {
       await _messaging.setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
@@ -145,8 +145,16 @@ class FcmService {
 
   /// 로그인/팀 선택 후 토큰 동기화 (uid, teamId 확정 시 호출)
   Future<void> syncTokenToFirestore() async {
-    final token = _lastToken ?? await _messaging.getToken();
-    if (token != null) await _saveTokenToFirestore(token);
+    try {
+      final token = _lastToken ?? await _messaging.getToken();
+      if (token != null) await _saveTokenToFirestore(token);
+    } catch (e) {
+      // iOS 시뮬레이터: APNS 토큰 미수신 시 getToken() 예외 발생
+      if (kDebugMode) {
+        // ignore: avoid_print
+        print('[FCM] 토큰 동기화 건너뜀: $e');
+      }
+    }
   }
 
   /// 로그아웃 시 토큰 제거
