@@ -41,14 +41,12 @@ class _TeamCreatePageState extends ConsumerState<TeamCreatePage> {
 
       final firestore = FirebaseFirestore.instance;
 
-      // teams (코어)
       await firestore.collection('teams').doc(teamId).set({
         'teamId': teamId,
         'name': name,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // teams_public (검색용)
       await firestore.collection('teams_public').doc(teamId).set({
         'teamId': teamId,
         'name': name,

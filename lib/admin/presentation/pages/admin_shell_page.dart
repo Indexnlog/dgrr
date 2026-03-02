@@ -15,14 +15,25 @@ final pendingCountProvider = StreamProvider<int>((ref) {
 
 /// 어드민 레이아웃 (사이드바 + 콘텐츠)
 class AdminShellPage extends ConsumerWidget {
-  const AdminShellPage({super.key, required this.child});
+  const AdminShellPage({
+    super.key,
+    required this.currentPath,
+    required this.child,
+  });
 
+  final String currentPath;
   final Widget child;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authStateChangesProvider).value;
+    final asyncUser = ref.watch(authStateChangesProvider);
 
+    // 스트림 초기 로딩 중에는 로그아웃 판단 보류 (리다이렉트 루프 방지)
+    if (asyncUser.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final user = asyncUser.value;
     if (user == null) {
       return const _RedirectToLogin();
     }
@@ -33,7 +44,7 @@ class AdminShellPage extends ConsumerWidget {
       body: Row(
         children: [
           _Sidebar(
-            currentPath: GoRouterState.of(context).matchedLocation,
+            currentPath: currentPath,
             pendingCount: pendingCount,
           ),
           Expanded(child: child),

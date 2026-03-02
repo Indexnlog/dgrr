@@ -136,6 +136,8 @@ class TeamMembersPage extends ConsumerWidget {
                           doc: d,
                           teamId: teamId,
                           onKick: () => _confirmKick(context, d, teamId),
+                          onRoleChange: (role) =>
+                              _setRole(context, d, role),
                         )),
 
                   // 기타(거절 등) 섹션
@@ -232,6 +234,29 @@ class TeamMembersPage extends ConsumerWidget {
     }
   }
 
+  Future<void> _setRole(
+    BuildContext context,
+    QueryDocumentSnapshot doc,
+    String role,
+  ) async {
+    try {
+      await doc.reference.update({
+        'role': role == '일반' ? FieldValue.delete() : role,
+      });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('역할이 "$role"로 변경됐습니다.')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('역할 변경 실패: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _confirmKick(
     BuildContext context,
     QueryDocumentSnapshot doc,
@@ -304,6 +329,7 @@ class _MemberCard extends StatelessWidget {
     this.onApprove,
     this.onReject,
     this.onKick,
+    this.onRoleChange,
   });
 
   final QueryDocumentSnapshot doc;
@@ -311,6 +337,7 @@ class _MemberCard extends StatelessWidget {
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
   final VoidCallback? onKick;
+  final void Function(String role)? onRoleChange;
 
   @override
   Widget build(BuildContext context) {
@@ -321,6 +348,7 @@ class _MemberCard extends StatelessWidget {
     final status = data['status'] as String? ?? 'unknown';
     final email = data['email'] as String?;
     final joinedAt = data['joinedAt'] as Timestamp?;
+    final role = data['role'] as String?;
     final isPending = status == 'pending';
     final isActive = status == 'active';
 
@@ -404,6 +432,54 @@ class _MemberCard extends StatelessWidget {
                       '신청일: ${_formatDate(joinedAt.toDate())}',
                       style: TextStyle(
                           fontSize: 11, color: Colors.grey.shade500),
+                    ),
+                  if (isActive)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.indigo.shade50,
+                              borderRadius: BorderRadius.circular(4),
+                              border:
+                                  Border.all(color: Colors.indigo.shade200),
+                            ),
+                            child: Text(
+                              role ?? '일반',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.indigo.shade700),
+                            ),
+                          ),
+                          if (onRoleChange != null)
+                            PopupMenuButton<String>(
+                              tooltip: '역할 변경',
+                              icon: Icon(Icons.arrow_drop_down,
+                                  size: 18,
+                                  color: Colors.indigo.shade400),
+                              onSelected: onRoleChange,
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(
+                                    value: '일반', child: Text('일반')),
+                                PopupMenuDivider(),
+                                PopupMenuItem(
+                                    value: 'admin', child: Text('admin')),
+                                PopupMenuItem(
+                                    value: '운영진', child: Text('운영진')),
+                                PopupMenuItem(
+                                    value: '총무', child: Text('총무')),
+                                PopupMenuItem(
+                                    value: 'treasurer',
+                                    child: Text('treasurer')),
+                                PopupMenuItem(
+                                    value: 'coach', child: Text('coach')),
+                              ],
+                            ),
+                        ],
+                      ),
                     ),
                 ],
               ),

@@ -2,22 +2,40 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 팀 검색용 공개 정보 (온보딩) - 누구나 읽기 가능
-    match /teams_public/{teamId} {
-      allow read: if true;
-      allow write: if false;
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'yjsoo7339@gmail.com';
     }
 
-    // 팀 운영 데이터 - 해당 팀 멤버( pending 포함 )만 접근
+    function isActiveMember(teamId) {
+      return request.auth != null
+        && get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function canApproveMembers(teamId) {
+      let role = get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role;
+      return isActiveMember(teamId) && role in ['admin', '운영진', '총무', 'treasurer', 'coach'];
+    }
+
+    // 팀 검색용 공개 정보 (온보딩) - 누구나 읽기, 어드민만 쓰기
+    match /teams_public/{teamId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 팀 운영 데이터 - 해당 팀 멤버( pending 포함 )만 접근, 어드민은 모두 가능
     match /teams/{teamId} {
-      allow read: if request.auth != null
-        && exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid));
-      allow create: if false;  // 팀 생성은 어드민/Cloud Function
-      allow update, delete: if request.auth != null
-        && isActiveMember(teamId);
+      allow read: if isAdmin()
+        || (request.auth != null
+          && exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)));
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin()
+        || (request.auth != null && isActiveMember(teamId));
 
       // 서브컬렉션: active 멤버만 읽기/쓰기 (members 제외)
       match /members/{memberId} {
+        // 어드민: 모든 멤버 문서 읽기/쓰기/삭제 가능
+        allow read, write: if isAdmin();
         // 가입 신청: 본인만 pending 문서 생성 가능
         allow create: if request.auth != null
           && request.auth.uid == memberId
@@ -106,13 +124,4 @@ service cloud.firestore {
     }
   }
 
-  function isActiveMember(teamId) {
-    return request.auth != null
-      && get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.status == 'active';
-  }
-
-  function canApproveMembers(teamId) {
-    let role = get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role;
-    return isActiveMember(teamId) && role in ['admin', '운영진', '총무', 'treasurer', 'coach'];
-  }
 }

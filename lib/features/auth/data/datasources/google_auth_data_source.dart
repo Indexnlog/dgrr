@@ -22,17 +22,21 @@ class GoogleAuthDataSource {
     if (_isInitialized) {
       return;
     }
+    // 웹: clientId=null → 웹 플러그인이 <meta name="google-signin-client_id"> 태그에서 자동 감지
+    // 모바일: iOS client ID 사용
     await googleSignIn.initialize(
-      clientId: iosClientId,
-      serverClientId: serverClientId,
+      clientId: kIsWeb ? null : iosClientId,
+      serverClientId: kIsWeb ? null : serverClientId,
     );
     _isInitialized = true;
   }
 
   Future<UserCredential> signInWithGoogle() async {
     try {
-      // 웹: google_sign_in FedCM 이슈 → Firebase Auth signInWithPopup 직접 사용
+      // 웹: Google Sign-In 초기화 후 Firebase Auth signInWithPopup 사용
       if (kIsWeb) {
+        print('[GoogleAuth] 웹 - 초기화 시작...');
+        await _ensureInitialized();
         print('[GoogleAuth] 웹 - signInWithPopup 시도...');
         final provider = GoogleAuthProvider()
           ..addScope('email')

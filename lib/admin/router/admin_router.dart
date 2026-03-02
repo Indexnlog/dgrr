@@ -42,7 +42,10 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const AdminLoginPage(),
           ),
           ShellRoute(
-            builder: (_, __, child) => AdminShellPage(child: child),
+            builder: (_, state, child) => AdminShellPage(
+              currentPath: state.uri.path,
+              child: child,
+            ),
             routes: [
               GoRoute(
                 path: 'teams',

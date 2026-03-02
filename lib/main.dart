@@ -55,11 +55,19 @@ Future<bool> _initializeFirebase() async {
     // FCM 백그라운드 핸들러 등록
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Firestore 오프라인 캐시 (네트워크 불안정 시에도 캐시된 데이터 표시)
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-    );
+    // Firestore 오프라인 캐시 설정
+    // 웹에서 persistence 활성화 시 규칙 거부된 write/read가 Future를 영원히 hang시키는 문제로
+    // 웹은 명시적으로 비활성화
+    if (kIsWeb) {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: false,
+      );
+    } else {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
+    }
 
     // 에뮬레이터는 opt-in: --dart-define=USE_FIREBASE_EMULATOR=true 일 때만 연결 (기본: 실제 Firebase)
     if (kDebugMode &&

@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -36,12 +37,17 @@ final signInAnonymouslyProvider = Provider<Future<UserCredential> Function()>((r
 /// 로그아웃 Provider
 final signOutProvider = Provider<Future<void> Function()>((ref) {
   final auth = FirebaseAuth.instance;
-  final googleSignIn = GoogleSignIn.instance;
 
   return () async {
-    await Future.wait([
-      auth.signOut(),
-      googleSignIn.signOut(),
-    ]);
+    // 웹: Firebase Auth만 사용 (google_sign_in은 웹에서 미사용)
+    // 모바일: Firebase Auth + Google Sign-In 모두 로그아웃
+    if (kIsWeb) {
+      await auth.signOut();
+    } else {
+      await Future.wait([
+        auth.signOut(),
+        GoogleSignIn.instance.signOut(),
+      ]);
+    }
   };
 });
