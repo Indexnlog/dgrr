@@ -298,15 +298,14 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
               style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
             ),
           ),
-          if (kDebugMode && kIsWeb) ...[
-            TextButton.icon(
+          if (kIsWeb)
+            IconButton(
               onPressed: () => nav_admin.navigateToAdmin(),
-              icon: Icon(Icons.admin_panel_settings, size: 18, color: Colors.white.withValues(alpha: 0.9)),
-              label: Text(
-                '어드민',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
-              ),
+              icon: Icon(Icons.admin_panel_settings, size: 20, color: Colors.white.withValues(alpha: 0.9)),
+              tooltip: '어드민 (팀 등록·가입 승인)',
+              style: IconButton.styleFrom(foregroundColor: Colors.white),
             ),
+          if (kDebugMode && kIsWeb)
             TextButton.icon(
               onPressed: _isSigningIn ? null : _handleDebugLogin,
               icon: Icon(Icons.bug_report, size: 18, color: Colors.white.withValues(alpha: 0.9)),
@@ -315,11 +314,39 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
               ),
             ),
-          ],
         ],
       ),
       body: Column(
         children: [
+          if (kIsWeb)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Material(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: () => nav_admin.navigateToAdmin(),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.admin_panel_settings, size: 20, color: AppTheme.primaryBlue),
+                        const SizedBox(width: 10),
+                        Text(
+                          '어드민 접속 (팀 등록·가입 승인)',
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
             child: TextField(

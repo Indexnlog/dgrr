@@ -55,6 +55,8 @@ class _TeamCreatePageState extends ConsumerState<TeamCreatePage> {
         'region': region.isNotEmpty ? region : '미정',
         'intro': intro.isNotEmpty ? intro : '팀 소개를 입력해주세요.',
         'isOpenJoin': true,
+        'memberCount': 0,
+        'logoUrl': null,
       });
 
       if (mounted) {

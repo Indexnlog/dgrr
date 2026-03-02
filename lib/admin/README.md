@@ -2,13 +2,19 @@
 
 팀 관리·가입 승인용 웹 어드민입니다.
 
+## 실행 전 체크리스트
+
+1. **어드민 이메일 등록**: `lib/admin/admin_config.dart`의 `adminAllowedEmails`에 본인 구글 이메일 추가
+2. **웹 구글 로그인**: `web/index.html`의 `google-signin-client_id` meta 태그에 Web Client ID 설정 (상세: `docs/웹_구글_로그인_설정.md`)
+
 ## 실행 방법
 
 ```bash
 # 웹으로 실행
 flutter run -d chrome
 
-# 브라우저에서 http://localhost:포트번호/admin 접속
+# 브라우저에서 접속 (해시 기반)
+# http://localhost:포트번호/#/admin
 ```
 
 ## 기능
