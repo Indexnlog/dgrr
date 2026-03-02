@@ -9,12 +9,18 @@ class TeamListPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // StreamBuilder 내부에서도 이 context 사용 (라우터를 올바르게 찾기 위해 캡처)
+    final pageContext = context;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('팀 목록'),
         actions: [
           TextButton.icon(
-            onPressed: () => context.go('/admin/teams/create'),
+            onPressed: () {
+              print('[Admin] AppBar 팀 생성 버튼 클릭');
+              pageContext.go('/admin/teams/create');
+            },
             icon: const Icon(Icons.add),
             label: const Text('팀 생성'),
           ),
@@ -22,7 +28,7 @@ class TeamListPage extends ConsumerWidget {
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('teams').snapshots(),
-        builder: (context, snapshot) {
+        builder: (_, snapshot) {
           if (snapshot.hasError) {
             return Center(child: Text('오류: ${snapshot.error}'));
           }
@@ -49,7 +55,10 @@ class TeamListPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
                   FilledButton.icon(
-                    onPressed: () => context.go('/admin/teams/create'),
+                    onPressed: () {
+                      print('[Admin] 첫 팀 생성하기 버튼 클릭');
+                      pageContext.go('/admin/teams/create');
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('첫 팀 생성하기'),
                   ),
