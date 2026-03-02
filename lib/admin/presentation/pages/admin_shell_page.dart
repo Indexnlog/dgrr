@@ -61,34 +61,41 @@ class _Sidebar extends StatelessWidget {
         color: Colors.grey.shade100,
         border: Border(right: BorderSide(color: Colors.grey.shade300)),
       ),
-      child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              '영원FC 어드민',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    '영원FC 어드민',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
+                ),
+                const SizedBox(height: 24),
+                _NavItem(
+                  icon: Icons.groups,
+                  label: '팀 목록',
+                  path: '/admin/teams',
+                  currentPath: currentPath,
+                  onTap: () => context.go('/admin/teams'),
+                ),
+                _NavItem(
+                  icon: Icons.add_circle_outline,
+                  label: '팀 생성',
+                  path: '/admin/teams/create',
+                  currentPath: currentPath,
+                  onTap: () => context.go('/admin/teams/create'),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
-          _NavItem(
-            icon: Icons.groups,
-            label: '팀 목록',
-            path: '/admin/teams',
-            currentPath: currentPath,
-            onTap: () => context.go('/admin/teams'),
-          ),
-          _NavItem(
-            icon: Icons.add_circle_outline,
-            label: '팀 생성',
-            path: '/admin/teams/create',
-            currentPath: currentPath,
-            onTap: () => context.go('/admin/teams/create'),
-          ),
-          const Spacer(),
+          // 로그아웃은 사이드바 하단에 고정
+          const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('로그아웃'),
