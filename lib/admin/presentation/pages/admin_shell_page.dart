@@ -1,7 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+/// 전체 팀에서 가입 신청 대기 수 (collectionGroup)
+final pendingCountProvider = StreamProvider<int>((ref) {
+  return FirebaseFirestore.instance
+      .collectionGroup('members')
+      .where('status', isEqualTo: 'pending')
+      .snapshots()
+      .map((s) => s.docs.length);
+});
 
 /// 어드민 레이아웃 (사이드바 + 콘텐츠)
 class AdminShellPage extends ConsumerWidget {
@@ -17,11 +27,14 @@ class AdminShellPage extends ConsumerWidget {
       return const _RedirectToLogin();
     }
 
+    final pendingCount = ref.watch(pendingCountProvider).value ?? 0;
+
     return Scaffold(
       body: Row(
         children: [
           _Sidebar(
             currentPath: GoRouterState.of(context).matchedLocation,
+            pendingCount: pendingCount,
           ),
           Expanded(child: child),
         ],
@@ -49,9 +62,10 @@ class _RedirectToLogin extends ConsumerWidget {
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.currentPath});
+  const _Sidebar({required this.currentPath, required this.pendingCount});
 
   final String currentPath;
+  final int pendingCount;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +96,7 @@ class _Sidebar extends StatelessWidget {
                   label: '팀 목록',
                   path: '/admin/teams',
                   currentPath: currentPath,
+                  badge: pendingCount,
                   onTap: () => context.go('/admin/teams'),
                 ),
                 _NavItem(
@@ -117,6 +132,7 @@ class _NavItem extends StatelessWidget {
     required this.path,
     required this.currentPath,
     required this.onTap,
+    this.badge = 0,
   });
 
   final IconData icon;
@@ -124,6 +140,7 @@ class _NavItem extends StatelessWidget {
   final String path;
   final String currentPath;
   final VoidCallback onTap;
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -131,9 +148,25 @@ class _NavItem extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, size: 20),
       title: Text(label),
+      trailing: badge > 0
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade600,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$badge',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            )
+          : null,
       selected: isActive,
       onTap: onTap,
     );
   }
 }
-

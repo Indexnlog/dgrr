@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../presentation/pages/admin_login_page.dart';
 import '../presentation/pages/admin_shell_page.dart';
 import '../presentation/pages/team_create_page.dart';
+import '../presentation/pages/team_edit_page.dart';
 import '../presentation/pages/team_list_page.dart';
 import '../presentation/pages/team_members_page.dart';
 
@@ -22,14 +23,16 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin',
         redirect: (_, state) {
-          final loc = state.matchedLocation;
+          // state.matchedLocation은 부모 경로까지만 반환하므로
+          // 전체 이동 경로는 state.uri.path로 확인
+          final loc = state.uri.path;
           // 로그인 페이지는 그대로
           if (loc == '/admin/login') return null;
           // 비로그인 시 무조건 로그인 화면으로
           if (FirebaseAuth.instance.currentUser == null) {
             return '/admin/login';
           }
-          // 로그인됐을 때 /admin만 오면 팀 목록으로
+          // 로그인됐을 때 /admin 루트만 오면 팀 목록으로
           if (loc == '/admin') return '/admin/teams';
           return null;
         },
@@ -50,6 +53,14 @@ final adminRouterProvider = Provider<GoRouter>((ref) {
                     path: 'create',
                     pageBuilder: (_, __) =>
                         const NoTransitionPage(child: TeamCreatePage()),
+                  ),
+                  GoRoute(
+                    path: ':teamId/edit',
+                    pageBuilder: (_, state) => NoTransitionPage(
+                      child: TeamEditPage(
+                        teamId: state.pathParameters['teamId']!,
+                      ),
+                    ),
                   ),
                   GoRoute(
                     path: ':teamId/members',
