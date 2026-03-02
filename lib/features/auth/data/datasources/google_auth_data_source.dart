@@ -34,21 +34,22 @@ class GoogleAuthDataSource {
       await _ensureInitialized();
       print('[GoogleAuth] 1. 초기화 완료');
 
+      // 1) 조용한 재로그인 시도 (캐시된 세션)
       GoogleSignInAccount? googleUser;
       try {
         print('[GoogleAuth] 2. Silent sign-in 시도...');
         googleUser = await googleSignIn.attemptLightweightAuthentication();
-        print('[GoogleAuth] 2. Silent sign-in 성공');
+        print('[GoogleAuth] 2. Silent sign-in 결과: ${googleUser != null ? "성공" : "null(캐시 없음)"}');
       } catch (e) {
-        print('[GoogleAuth] 2. Silent sign-in 실패: $e');
+        print('[GoogleAuth] 2. Silent sign-in 예외: $e');
+      }
+
+      // 2) 조용한 재로그인 실패(null 포함) → 사용자에게 Google 팝업 표시
+      // authenticate()는 취소 시 null 대신 예외를 던짐 (non-nullable 반환)
+      if (googleUser == null) {
         print('[GoogleAuth] 3. 사용자 인증 UI 표시...');
         googleUser = await googleSignIn.authenticate();
         print('[GoogleAuth] 3. 사용자 인증 완료');
-      }
-
-      if (googleUser == null) {
-        print('[GoogleAuth] 사용자가 취소함');
-        throw const AuthCanceledException();
       }
 
       print('[GoogleAuth] 4. 인증 정보 가져오기...');
