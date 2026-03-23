@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../events/data/models/event_model.dart';
 import '../../../events/presentation/providers/event_providers.dart';
@@ -27,7 +28,6 @@ class _DS {
   static const attendGreen = Color(0xFF2EA043);
   static const absentRed = Color(0xFFDA3633);
   static const divider = Color(0xFF30363D);
-  static const fixedBlue = Color(0xFF58A6FF);
   static const classBlue = Color(0xFF388BFD);
 }
 
@@ -51,6 +51,7 @@ class _ReservationNoticeCreatePageState
     _fallbackMemo.dispose();
     super.dispose();
   }
+
   ReservationNoticeForType _selectedType = ReservationNoticeForType.class_;
   String? _selectedEventId;
   String? _selectedMatchId;
@@ -152,9 +153,8 @@ class _ReservationNoticeCreatePageState
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isCreating ||
-                          teamId == null ||
-                          currentUser == null
+                  onPressed:
+                      _isCreating || teamId == null || currentUser == null
                       ? null
                       : _createNotice,
                   style: ElevatedButton.styleFrom(
@@ -231,7 +231,7 @@ class _ReservationNoticeCreatePageState
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? _DS.classBlue.withValues(alpha:0.15)
+                          ? _DS.classBlue.withValues(alpha: 0.15)
                           : _DS.bgCard,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
@@ -270,7 +270,11 @@ class _ReservationNoticeCreatePageState
                           ),
                         ),
                         if (isSelected)
-                          Icon(Icons.check_circle, color: _DS.classBlue, size: 20),
+                          Icon(
+                            Icons.check_circle,
+                            color: _DS.classBlue,
+                            size: 20,
+                          ),
                       ],
                     ),
                   ),
@@ -283,11 +287,14 @@ class _ReservationNoticeCreatePageState
       loading: () => const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
-          child: CircularProgressIndicator(color: _DS.teamRed, strokeWidth: 2.5),
+          child: CircularProgressIndicator(
+            color: _DS.teamRed,
+            strokeWidth: 2.5,
+          ),
         ),
       ),
       error: (e, _) => Text(
-        '수업 목록을 불러올 수 없습니다: $e',
+        ErrorHandler.toUserMessage(e, fallback: '수업 목록을 불러올 수 없습니다'),
         style: TextStyle(color: _DS.absentRed, fontSize: 13),
       ),
     );
@@ -340,7 +347,7 @@ class _ReservationNoticeCreatePageState
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? _DS.gold.withValues(alpha:0.15)
+                          ? _DS.gold.withValues(alpha: 0.15)
                           : _DS.bgCard,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
@@ -392,11 +399,14 @@ class _ReservationNoticeCreatePageState
       loading: () => const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
-          child: CircularProgressIndicator(color: _DS.teamRed, strokeWidth: 2.5),
+          child: CircularProgressIndicator(
+            color: _DS.teamRed,
+            strokeWidth: 2.5,
+          ),
         ),
       ),
       error: (e, _) => Text(
-        '경기 목록을 불러올 수 없습니다: $e',
+        ErrorHandler.toUserMessage(e, fallback: '경기 목록을 불러올 수 없습니다'),
         style: TextStyle(color: _DS.absentRed, fontSize: 13),
       ),
     );
@@ -456,7 +466,10 @@ class _ReservationNoticeCreatePageState
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: _DS.divider),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
       ),
     );
   }
@@ -471,14 +484,16 @@ class _ReservationNoticeCreatePageState
     final openAtStr = ReservationNoticeService.formatOpenAt(openAt);
 
     final slots = grounds
-        .map((g) => ReservationNoticeSlot(
-              groundId: g.groundId,
-              groundName: g.name,
-              address: g.address,
-              url: g.url,
-              managers: g.managers ?? [],
-              result: SlotResult.pending,
-            ))
+        .map(
+          (g) => ReservationNoticeSlot(
+            groundId: g.groundId,
+            groundName: g.name,
+            address: g.address,
+            url: g.url,
+            managers: g.managers ?? [],
+            result: SlotResult.pending,
+          ),
+        )
         .toList();
 
     return Container(
@@ -533,7 +548,10 @@ class _ReservationNoticeCreatePageState
     final teamId = ref.read(currentTeamIdProvider);
     final currentUser = ref.read(currentUserProvider);
     final grounds = ref.read(activeGroundsProvider).value;
-    if (teamId == null || currentUser == null || grounds == null || _targetDate == null) {
+    if (teamId == null ||
+        currentUser == null ||
+        grounds == null ||
+        _targetDate == null) {
       return;
     }
 
@@ -544,14 +562,16 @@ class _ReservationNoticeCreatePageState
         _selectedType,
       );
       final slots = grounds
-          .map((g) => ReservationNoticeSlot(
-                groundId: g.groundId,
-                groundName: g.name,
-                address: g.address,
-                url: g.url,
-                managers: g.managers ?? [],
-                result: SlotResult.pending,
-              ))
+          .map(
+            (g) => ReservationNoticeSlot(
+              groundId: g.groundId,
+              groundName: g.name,
+              address: g.address,
+              url: g.url,
+              managers: g.managers ?? [],
+              result: SlotResult.pending,
+            ),
+          )
           .toList();
 
       ReservationNoticeFallback? fallback;
@@ -559,7 +579,9 @@ class _ReservationNoticeCreatePageState
           (_fallbackTitle.text.isNotEmpty || _fallbackUrl.text.isNotEmpty)) {
         fallback = ReservationNoticeFallback(
           title: _fallbackTitle.text.isEmpty ? null : _fallbackTitle.text,
-          openAtText: _fallbackOpenAt.text.isEmpty ? null : _fallbackOpenAt.text,
+          openAtText: _fallbackOpenAt.text.isEmpty
+              ? null
+              : _fallbackOpenAt.text,
           url: _fallbackUrl.text.isEmpty ? null : _fallbackUrl.text,
           fee: int.tryParse(_fallbackFee.text),
           memo: _fallbackMemo.text.isEmpty ? null : _fallbackMemo.text,
@@ -598,12 +620,7 @@ class _ReservationNoticeCreatePageState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('오류: $e'),
-            backgroundColor: _DS.absentRed,
-          ),
-        );
+        ErrorHandler.showError(context, e, fallback: '예약 공지 생성 중 오류가 발생했습니다');
       }
     } finally {
       if (mounted) setState(() => _isCreating = false);
@@ -629,11 +646,9 @@ class _TypeChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? _DS.teamRed.withValues(alpha:0.2) : _DS.bgCard,
+          color: isSelected ? _DS.teamRed.withValues(alpha: 0.2) : _DS.bgCard,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? _DS.teamRed : _DS.divider,
-          ),
+          border: Border.all(color: isSelected ? _DS.teamRed : _DS.divider),
         ),
         child: Text(
           label,

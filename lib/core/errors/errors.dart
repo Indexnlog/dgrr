@@ -3,3 +3,4 @@ library;
 
 export 'error_handler.dart';
 export 'exceptions.dart';
+export 'firebase_exception_mapper.dart';

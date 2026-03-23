@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../domain/entities/match.dart';
@@ -16,8 +17,19 @@ class MatchTabPage extends ConsumerStatefulWidget {
 }
 
 class _MatchTabPageState extends ConsumerState<MatchTabPage> {
+  static const int _pageSize = 20;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  int _pageLimit = _pageSize;
+  bool _isPaging = false;
+
+  void _requestNextPage(int currentCount) {
+    if (_isPaging || currentCount < _pageLimit) return;
+    setState(() {
+      _isPaging = true;
+      _pageLimit += _pageSize;
+    });
+  }
 
   @override
   void dispose() {
@@ -27,7 +39,9 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
 
   @override
   Widget build(BuildContext context) {
-    final matchesAsync = ref.watch(upcomingMatchesProvider);
+    final matchesAsync = ref.watch(
+      upcomingMatchesWithLimitProvider(_pageLimit),
+    );
 
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
@@ -54,7 +68,11 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
                     onPressed: () => context.push('/match/opponents'),
                     child: Text(
                       '상대팀',
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -64,15 +82,25 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: TextField(
                 controller: _searchController,
-                onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+                onChanged: (v) =>
+                    setState(() => _searchQuery = v.trim().toLowerCase()),
                 decoration: InputDecoration(
                   hintText: '상대팀명으로 검색',
                   hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 14),
-                  prefixIcon: Icon(Icons.search, color: AppTheme.textMuted, size: 20),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: AppTheme.textMuted,
+                    size: 20,
+                  ),
                   filled: true,
                   fillColor: AppTheme.bgCard,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   isDense: true,
                 ),
               ),
@@ -80,14 +108,31 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
             Expanded(
               child: matchesAsync.when(
                 data: (matches) {
+                  if (_isPaging) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() {
+                          _isPaging = false;
+                        });
+                      }
+                    });
+                  }
                   final filtered = _searchQuery.isEmpty
                       ? matches
-                      : matches.where((m) =>
-                          (m.opponentName ?? '').toLowerCase().contains(_searchQuery)).toList();
+                      : matches
+                            .where(
+                              (m) => (m.opponentName ?? '')
+                                  .toLowerCase()
+                                  .contains(_searchQuery),
+                            )
+                            .toList();
+                  final hasMore = matches.length >= _pageLimit;
                   if (filtered.isEmpty) {
                     return RefreshIndicator(
                       onRefresh: () async {
-                        ref.invalidate(upcomingMatchesProvider);
+                        ref.invalidate(
+                          upcomingMatchesWithLimitProvider(_pageLimit),
+                        );
                       },
                       color: AppTheme.teamRed,
                       child: ListView(
@@ -97,11 +142,22 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
                           Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(PhosphorIconsRegular.soccerBall, size: 56, color: AppTheme.textMuted.withValues(alpha: 0.4)),
+                              Icon(
+                                PhosphorIconsRegular.soccerBall,
+                                size: 56,
+                                color: AppTheme.textMuted.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               Text(
-                                _searchQuery.isEmpty ? '예정된 매치가 없습니다' : '검색 결과가 없습니다',
-                                style: const TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                                _searchQuery.isEmpty
+                                    ? '예정된 매치가 없습니다'
+                                    : '검색 결과가 없습니다',
+                                style: const TextStyle(
+                                  color: AppTheme.textMuted,
+                                  fontSize: 14,
+                                ),
                               ),
                             ],
                           ),
@@ -111,28 +167,59 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
                   }
                   return RefreshIndicator(
                     onRefresh: () async {
-                      ref.invalidate(upcomingMatchesProvider);
+                      ref.invalidate(
+                        upcomingMatchesWithLimitProvider(_pageLimit),
+                      );
                     },
                     color: AppTheme.teamRed,
-                    child: ListView.separated(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final match = filtered[index];
-                        return _MatchListTile(match: match, index: index);
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification.metrics.pixels >=
+                            notification.metrics.maxScrollExtent - 180) {
+                          _requestNextPage(matches.length);
+                        }
+                        return false;
                       },
+                      child: ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                        itemCount:
+                            filtered.length + ((hasMore || _isPaging) ? 1 : 0),
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          if (index >= filtered.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: AppTheme.accentLime,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
+                          }
+                          final match = filtered[index];
+                          return _MatchListTile(match: match, index: index);
+                        },
+                      ),
                     ),
                   );
                 },
                 loading: () => const Center(
-                  child: CircularProgressIndicator(color: AppTheme.accentLime, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: AppTheme.accentLime,
+                    strokeWidth: 2,
+                  ),
                 ),
                 error: (e, _) => ErrorRetryView(
-                  message: '경기 목록을 불러올 수 없습니다',
+                  message: ErrorHandler.toUserMessage(
+                    e,
+                    fallback: '경기 목록을 불러올 수 없습니다',
+                  ),
                   detail: e.toString(),
-                  onRetry: () => ref.invalidate(upcomingMatchesProvider),
+                  onRetry: () => ref.invalidate(
+                    upcomingMatchesWithLimitProvider(_pageLimit),
+                  ),
                 ),
               ),
             ),
@@ -158,7 +245,11 @@ class _MatchListTile extends StatelessWidget {
     if (match.date == null) return null;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final matchDay = DateTime(match.date!.year, match.date!.month, match.date!.day);
+    final matchDay = DateTime(
+      match.date!.year,
+      match.date!.month,
+      match.date!.day,
+    );
     return matchDay.difference(today).inDays;
   }
 
@@ -208,7 +299,11 @@ class _MatchListTile extends StatelessWidget {
                 children: [
                   Text(
                     'vs ${match.opponentName ?? '상대 미정'}',
-                    style: const TextStyle(color: AppTheme.textPrimary, fontSize: 17, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
@@ -216,15 +311,22 @@ class _MatchListTile extends StatelessWidget {
                     children: [
                       if (daysUntil != null && daysUntil >= 0) ...[
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: daysUntil == 0 ? AppTheme.teamRed.withValues(alpha: 0.3) : AppTheme.textMuted.withValues(alpha: 0.2),
+                            color: daysUntil == 0
+                                ? AppTheme.teamRed.withValues(alpha: 0.3)
+                                : AppTheme.textMuted.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             daysUntil == 0 ? 'D-day' : 'D-$daysUntil',
                             style: TextStyle(
-                              color: daysUntil == 0 ? AppTheme.teamRed : AppTheme.textMuted,
+                              color: daysUntil == 0
+                                  ? AppTheme.teamRed
+                                  : AppTheme.textMuted,
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                             ),
@@ -235,7 +337,10 @@ class _MatchListTile extends StatelessWidget {
                       Expanded(
                         child: Text(
                           '$dateStr · ${match.startTime ?? '--:--'} · ${match.location ?? '미정'}',
-                          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -253,11 +358,19 @@ class _MatchListTile extends StatelessWidget {
               ),
               child: Text(
                 statusLabel,
-                style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             const SizedBox(width: 8),
-            Icon(PhosphorIconsRegular.caretRight, color: AppTheme.textMuted, size: 18),
+            Icon(
+              PhosphorIconsRegular.caretRight,
+              color: AppTheme.textMuted,
+              size: 18,
+            ),
           ],
         ),
       ),

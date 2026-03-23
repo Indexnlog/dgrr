@@ -16,7 +16,6 @@ import '../../../teams/presentation/providers/team_members_provider.dart';
 import '../../../teams/presentation/providers/team_providers.dart';
 import '../providers/my_stats_provider.dart';
 
-
 class MyPage extends ConsumerWidget {
   const MyPage({super.key});
 
@@ -87,7 +86,11 @@ class MyPage extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.how_to_vote, color: AppTheme.textSecondary, size: 18),
+                  Icon(
+                    Icons.how_to_vote,
+                    color: AppTheme.textSecondary,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     '$seasonLabel 등록',
@@ -126,7 +129,9 @@ class MyPage extends ConsumerWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            myReg.status == RegistrationStatus.paid ? '납부완료' : '미납',
+                            myReg.status == RegistrationStatus.paid
+                                ? '납부완료'
+                                : '미납',
                             style: TextStyle(
                               color: myReg.status == RegistrationStatus.paid
                                   ? AppTheme.accentGreen
@@ -140,7 +145,8 @@ class MyPage extends ConsumerWidget {
                     ),
                     if (isWithinRegistrationVotePeriod)
                       TextButton(
-                        onPressed: () => showMonthlyRegistrationVoteSheet(context),
+                        onPressed: () =>
+                            showMonthlyRegistrationVoteSheet(context),
                         child: const Text('변경', style: TextStyle(fontSize: 13)),
                       ),
                   ],
@@ -156,7 +162,8 @@ class MyPage extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: user?.uid != null && isWithinRegistrationVotePeriod
+                    onPressed:
+                        user?.uid != null && isWithinRegistrationVotePeriod
                         ? () => showMonthlyRegistrationVoteSheet(context)
                         : null,
                     icon: const Icon(Icons.how_to_vote, size: 18),
@@ -178,16 +185,16 @@ class MyPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildFeeStatusCard(
-    AsyncValue<List<RegistrationModel>> regsAsync,
-  ) {
+  Widget _buildFeeStatusCard(AsyncValue<List<RegistrationModel>> regsAsync) {
     return regsAsync.when(
       data: (regs) {
         final feeRegs = regs
-            .where((r) =>
-                r.eventId.isNotEmpty &&
-                r.eventId.length == 7 &&
-                r.eventId.contains('-'))
+            .where(
+              (r) =>
+                  r.eventId.isNotEmpty &&
+                  r.eventId.length == 7 &&
+                  r.eventId.contains('-'),
+            )
             .toList();
         if (feeRegs.isEmpty) {
           return const SizedBox.shrink();
@@ -204,7 +211,11 @@ class MyPage extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.payment_outlined, color: AppTheme.textSecondary, size: 18),
+                  Icon(
+                    Icons.payment_outlined,
+                    color: AppTheme.textSecondary,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   const Text(
                     '회비 납부 현황',
@@ -251,14 +262,16 @@ class MyPage extends ConsumerWidget {
                         ),
                         decoration: BoxDecoration(
                           color: isPaid
-                              ? AppTheme.accentGreen.withValues(alpha:0.15)
+                              ? AppTheme.accentGreen.withValues(alpha: 0.15)
                               : AppTheme.surface,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           isPaid ? '납부완료' : '미납',
                           style: TextStyle(
-                            color: isPaid ? AppTheme.accentGreen : AppTheme.textMuted,
+                            color: isPaid
+                                ? AppTheme.accentGreen
+                                : AppTheme.textMuted,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
@@ -281,7 +294,11 @@ class MyPage extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.payment_outlined, color: AppTheme.textSecondary, size: 18),
+            Icon(
+              Icons.payment_outlined,
+              color: AppTheme.textSecondary,
+              size: 18,
+            ),
             const SizedBox(width: 12),
             SizedBox(
               width: 16,
@@ -323,8 +340,8 @@ class MyPage extends ConsumerWidget {
     final initial = isAnonymous
         ? 'T'
         : (user?.displayName?.isNotEmpty == true
-            ? user.displayName!.substring(0, 1).toUpperCase()
-            : '?');
+              ? user.displayName!.substring(0, 1).toUpperCase()
+              : '?');
     final memberMap = ref.watch(memberMapProvider);
     final member = user?.uid != null ? memberMap[user!.uid] : null;
     final photoUrl = member?.photoUrl ?? user?.photoURL;
@@ -359,12 +376,18 @@ class MyPage extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   user?.email ?? '익명 로그인',
-                  style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                  ),
                 ),
                 if (member?.joinedAt != null) ...[
                   const SizedBox(height: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.surface,
                       borderRadius: BorderRadius.circular(6),
@@ -393,8 +416,8 @@ class MyPage extends ConsumerWidget {
     final rateColor = rate >= 0.8
         ? AppTheme.accentGreen
         : rate >= 0.5
-            ? AppTheme.gold
-            : AppTheme.absentRed;
+        ? AppTheme.gold
+        : AppTheme.absentRed;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -408,7 +431,11 @@ class MyPage extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.school_outlined, color: AppTheme.textSecondary, size: 18),
+              Icon(
+                Icons.school_outlined,
+                color: AppTheme.textSecondary,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               const Text(
                 '수업 출석',
@@ -480,8 +507,16 @@ class MyPage extends ConsumerWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              _StatItem(label: '참석', value: '${stats.attended}', color: AppTheme.accentGreen),
-              _StatItem(label: '불참', value: '${stats.absent}', color: AppTheme.absentRed),
+              _StatItem(
+                label: '참석',
+                value: '${stats.attended}',
+                color: AppTheme.accentGreen,
+              ),
+              _StatItem(
+                label: '불참',
+                value: '${stats.absent}',
+                color: AppTheme.absentRed,
+              ),
             ],
           ),
         ],
@@ -499,7 +534,9 @@ class MyPage extends ConsumerWidget {
     final perfAsync = ref.watch(myMatchPerformanceProvider(uid));
     return perfAsync.when(
       data: (perf) {
-        if (perf.goals == 0 && perf.assists == 0) return const SizedBox.shrink();
+        if (perf.goals == 0 && perf.assists == 0) {
+          return const SizedBox.shrink();
+        }
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -520,9 +557,17 @@ class MyPage extends ConsumerWidget {
                 ),
               ),
               const Spacer(),
-              _StatItem(label: '골', value: '${perf.goals}', color: AppTheme.teamRed),
+              _StatItem(
+                label: '골',
+                value: '${perf.goals}',
+                color: AppTheme.teamRed,
+              ),
               const SizedBox(width: 16),
-              _StatItem(label: '도움', value: '${perf.assists}', color: AppTheme.accentGreen),
+              _StatItem(
+                label: '도움',
+                value: '${perf.assists}',
+                color: AppTheme.accentGreen,
+              ),
             ],
           ),
         );
@@ -552,7 +597,11 @@ class MyPage extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.bar_chart_rounded, color: AppTheme.textSecondary, size: 18),
+            Icon(
+              Icons.bar_chart_rounded,
+              color: AppTheme.textSecondary,
+              size: 18,
+            ),
             const SizedBox(width: 8),
             const Text(
               '내 출석 현황',
@@ -569,7 +618,11 @@ class MyPage extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.sports_soccer_outlined, size: 48, color: AppTheme.textMuted.withValues(alpha: 0.5)),
+              Icon(
+                Icons.sports_soccer_outlined,
+                size: 48,
+                color: AppTheme.textMuted.withValues(alpha: 0.5),
+              ),
               const SizedBox(height: 12),
               Text(
                 '아직 완료된 경기가 없어요',
@@ -582,10 +635,7 @@ class MyPage extends ConsumerWidget {
               const SizedBox(height: 4),
               Text(
                 '경기에 참석하면 출석이 기록됩니다',
-                style: TextStyle(
-                  color: AppTheme.textMuted,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
               ),
             ],
           ),
@@ -600,15 +650,19 @@ class MyPage extends ConsumerWidget {
     final rateColor = rate >= 0.8
         ? AppTheme.accentGreen
         : rate >= 0.5
-            ? AppTheme.gold
-            : AppTheme.absentRed;
+        ? AppTheme.gold
+        : AppTheme.absentRed;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.bar_chart_rounded, color: AppTheme.textSecondary, size: 18),
+            Icon(
+              Icons.bar_chart_rounded,
+              color: AppTheme.textSecondary,
+              size: 18,
+            ),
             const SizedBox(width: 8),
             const Text(
               '내 출석 현황',
@@ -620,10 +674,7 @@ class MyPage extends ConsumerWidget {
             ),
             const Spacer(),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 3,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.circular(6),
@@ -643,64 +694,61 @@ class MyPage extends ConsumerWidget {
         // 출석률 프로그레스
         Row(
           children: [
-              Text(
-                '$ratePercent%',
-                style: TextStyle(
-                  color: rateColor,
-                  fontSize: 36,
-                  fontWeight: FontWeight.w900,
-                ),
+            Text(
+              '$ratePercent%',
+              style: TextStyle(
+                color: rateColor,
+                fontSize: 36,
+                fontWeight: FontWeight.w900,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '출석률',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '출석률',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: SizedBox(
+                      height: 8,
+                      child: LinearProgressIndicator(
+                        value: rate,
+                        backgroundColor: AppTheme.surface,
+                        color: rateColor,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: SizedBox(
-                        height: 8,
-                        child: LinearProgressIndicator(
-                          value: rate,
-                          backgroundColor: AppTheme.surface,
-                          color: rateColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
+          ],
         ),
         const SizedBox(height: 16),
-        Container(
-          height: 1,
-          color: AppTheme.divider,
-        ),
+        Container(height: 1, color: AppTheme.divider),
         const SizedBox(height: 14),
         // 상세 스탯
         Row(
-            children: [
-              _StatItem(
-                label: '참석',
-                value: '${stats.attended}',
-                color: AppTheme.accentGreen,
-              ),
-              _StatItem(
-                label: '불참',
-                value: '${stats.absent}',
-                color: AppTheme.absentRed,
-              ),
-              _StatItem(
+          children: [
+            _StatItem(
+              label: '참석',
+              value: '${stats.attended}',
+              color: AppTheme.accentGreen,
+            ),
+            _StatItem(
+              label: '불참',
+              value: '${stats.absent}',
+              color: AppTheme.absentRed,
+            ),
+            _StatItem(
               label: '미투표',
               value: '${stats.noVote}',
               color: AppTheme.textMuted,
@@ -714,6 +762,11 @@ class MyPage extends ConsumerWidget {
   Widget _buildMenuSection(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
+        _MenuItem(
+          icon: Icons.receipt_long_outlined,
+          label: '내 회비 현황',
+          onTap: () => context.push('/my/fee-status'),
+        ),
         _MenuItem(
           icon: Icons.payment_outlined,
           label: '회비 관리',
@@ -767,9 +820,7 @@ class MyPage extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('팀 탈퇴'),
-        content: const Text(
-          '정말 팀을 탈퇴하시겠습니까? 탈퇴 후에는 팀 데이터에 접근할 수 없습니다.',
-        ),
+        content: const Text('정말 팀을 탈퇴하시겠습니까? 탈퇴 후에는 팀 데이터에 접근할 수 없습니다.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -782,19 +833,18 @@ class MyPage extends ConsumerWidget {
               final uid = ref.read(currentUserProvider)?.uid;
               if (teamId == null || uid == null) return;
               try {
-                await ref.read(teamRepositoryProvider).leaveTeam(
-                      teamId: teamId,
-                      memberId: uid,
-                    );
+                await ref
+                    .read(teamRepositoryProvider)
+                    .leaveTeam(teamId: teamId, memberId: uid);
                 await ref.read(currentTeamIdProvider.notifier).clearTeam();
                 if (context.mounted) {
                   context.go('/');
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('탈퇴 실패: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('탈퇴 실패: $e')));
                 }
               }
             },

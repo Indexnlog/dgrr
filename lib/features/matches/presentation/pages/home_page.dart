@@ -21,7 +21,6 @@ import '../../../teams/presentation/providers/team_members_provider.dart';
 import '../../domain/entities/match.dart';
 import '../providers/match_providers.dart';
 
-
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
@@ -69,7 +68,8 @@ class _HomePageState extends ConsumerState<HomePage>
     final allMembers = ref.watch(teamMembersProvider).value ?? [];
     final activePolls = ref.watch(activePollsProvider).value ?? [];
     final recentPosts = ref.watch(recentPostsProvider).value ?? [];
-    final upcomingNotices = ref.watch(upcomingReservationNoticesProvider).value ?? [];
+    final upcomingNotices =
+        ref.watch(upcomingReservationNoticesProvider).value ?? [];
 
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
@@ -78,7 +78,8 @@ class _HomePageState extends ConsumerState<HomePage>
         child: matchesAsync.when(
           data: (matches) {
             final canManagePosts =
-                PermissionChecker.isAdmin(ref) || PermissionChecker.isCoach(ref);
+                PermissionChecker.isAdmin(ref) ||
+                PermissionChecker.isCoach(ref);
             final q = _matchSearchQuery.toLowerCase().trim();
             final filteredMatches = q.isEmpty
                 ? matches
@@ -97,74 +98,72 @@ class _HomePageState extends ConsumerState<HomePage>
               color: AppTheme.teamRed,
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                SliverToBoxAdapter(
-                    child: _buildGreetingHeader(currentUser, canManagePosts)),
-                if (activePolls.isNotEmpty)
+                slivers: [
                   SliverToBoxAdapter(
-                    child: _buildActivePollBanner(context, activePolls.length),
+                    child: _buildGreetingHeader(currentUser, canManagePosts),
                   ),
-                if (upcomingNotices.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _buildReservationNoticeBanner(
-                      context,
-                      upcomingNotices,
+                  if (activePolls.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _buildActivePollBanner(
+                        context,
+                        activePolls.length,
+                      ),
                     ),
-                  ),
-                if (recentPosts.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _buildRecentNotice(context, recentPosts.first),
-                  ),
-                if (matches.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _buildQuickStats(matches, allMembers.length),
-                  ),
-                if (matches.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _buildMatchSearchBar(),
-                  ),
-                if (filteredMatches.isEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
-                      child: Center(
-                        child: Text(
-                          matches.isEmpty
-                              ? '예정된 경기가 없습니다'
-                              : '검색 결과가 없습니다',
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 16,
-                            letterSpacing: 0.5,
+                  if (upcomingNotices.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _buildReservationNoticeBanner(
+                        context,
+                        upcomingNotices,
+                      ),
+                    ),
+                  if (recentPosts.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _buildRecentNotice(context, recentPosts.first),
+                    ),
+                  if (matches.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _buildQuickStats(matches, allMembers.length),
+                    ),
+                  if (matches.isNotEmpty)
+                    SliverToBoxAdapter(child: _buildMatchSearchBar()),
+                  if (filteredMatches.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+                        child: Center(
+                          child: Text(
+                            matches.isEmpty ? '예정된 경기가 없습니다' : '검색 결과가 없습니다',
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 16,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  )
-                else ...[
-                  SliverToBoxAdapter(
-                    child: _buildSectionLabel('다가오는 경기'),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => Padding(
-                          padding: const EdgeInsets.only(bottom: 20),
-                          child: _MatchCard(
-                            match: filteredMatches[index],
-                            uid: currentUser?.uid,
-                            isNext: index == 0,
-                            pulseAnimation: _pulseController,
+                    )
+                  else ...[
+                    SliverToBoxAdapter(child: _buildSectionLabel('다가오는 경기')),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: _MatchCard(
+                              match: filteredMatches[index],
+                              uid: currentUser?.uid,
+                              isNext: index == 0,
+                              pulseAnimation: _pulseController,
+                            ),
                           ),
+                          childCount: filteredMatches.length,
                         ),
-                        childCount: filteredMatches.length,
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
+              ),
             );
           },
           loading: () => ListView(
@@ -259,12 +258,20 @@ class _HomePageState extends ConsumerState<HomePage>
               ),
               if (canManagePosts)
                 IconButton(
-                  icon: Icon(PhosphorIconsRegular.pencilSimple, color: AppTheme.textMuted, size: 24),
+                  icon: Icon(
+                    PhosphorIconsRegular.pencilSimple,
+                    color: AppTheme.textMuted,
+                    size: 24,
+                  ),
                   onPressed: () => context.push('/home/posts/create'),
                   tooltip: '공지 작성',
                 ),
               IconButton(
-                icon: Icon(PhosphorIconsRegular.megaphone, color: AppTheme.textMuted, size: 22),
+                icon: Icon(
+                  PhosphorIconsRegular.megaphone,
+                  color: AppTheme.textMuted,
+                  size: 22,
+                ),
                 onPressed: () => context.push('/home/posts'),
                 tooltip: '공지 목록',
               ),
@@ -330,7 +337,11 @@ class _HomePageState extends ConsumerState<HomePage>
       ),
       child: Row(
         children: [
-          Icon(PhosphorIconsRegular.megaphone, color: AppTheme.textMuted, size: 18),
+          Icon(
+            PhosphorIconsRegular.megaphone,
+            color: AppTheme.textMuted,
+            size: 18,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -344,7 +355,11 @@ class _HomePageState extends ConsumerState<HomePage>
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          Icon(PhosphorIconsRegular.caretRight, color: AppTheme.textMuted, size: 18),
+          Icon(
+            PhosphorIconsRegular.caretRight,
+            color: AppTheme.textMuted,
+            size: 18,
+          ),
         ],
       ),
     );
@@ -362,10 +377,9 @@ class _HomePageState extends ConsumerState<HomePage>
     List<ReservationNoticeModel> notices,
   ) {
     final notice = notices.first;
-    final typeLabel =
-        notice.reservedForType == ReservationNoticeForType.class_
-            ? '수업'
-            : '매치';
+    final typeLabel = notice.reservedForType == ReservationNoticeForType.class_
+        ? '수업'
+        : '매치';
     final dateStr =
         '${notice.targetDate.month}/${notice.targetDate.day} $typeLabel';
     final dDay = notice.openAt != null
@@ -379,9 +393,11 @@ class _HomePageState extends ConsumerState<HomePage>
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppTheme.fixedBlue.withValues(alpha:0.1),
+            color: AppTheme.fixedBlue.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.fixedBlue.withValues(alpha:0.3)),
+            border: Border.all(
+              color: AppTheme.fixedBlue.withValues(alpha: 0.3),
+            ),
           ),
           child: Row(
             children: [
@@ -430,7 +446,9 @@ class _HomePageState extends ConsumerState<HomePage>
           decoration: BoxDecoration(
             color: AppTheme.attendGreen.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.attendGreen.withValues(alpha: 0.4)),
+            border: Border.all(
+              color: AppTheme.attendGreen.withValues(alpha: 0.4),
+            ),
           ),
           child: Row(
             children: [
@@ -456,16 +474,24 @@ class _HomePageState extends ConsumerState<HomePage>
 
   Widget _buildQuickStats(List<Match> matches, int memberCount) {
     final nextMatch = matches.first;
-    final daysUntil = nextMatch.date?.difference(DateTime(
-                DateTime.now().year, DateTime.now().month, DateTime.now().day))
-            .inDays;
+    final daysUntil = nextMatch.date
+        ?.difference(
+          DateTime(
+            DateTime.now().year,
+            DateTime.now().month,
+            DateTime.now().day,
+          ),
+        )
+        .inDays;
     final dDayText = daysUntil == 0
         ? 'TODAY'
         : daysUntil == 1
-            ? 'D-1'
-            : 'D-${daysUntil ?? "?"}';
-    final totalAttending =
-        matches.fold<int>(0, (sum, m) => sum + (m.attendees?.length ?? 0));
+        ? 'D-1'
+        : 'D-${daysUntil ?? "?"}';
+    final totalAttending = matches.fold<int>(
+      0,
+      (sum, m) => sum + (m.attendees?.length ?? 0),
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -512,7 +538,10 @@ class _HomePageState extends ConsumerState<HomePage>
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
       ),
     );
@@ -572,8 +601,10 @@ class _MatchCard extends ConsumerStatefulWidget {
 class _MatchCardState extends ConsumerState<_MatchCard> {
   /// Optimistic UI: null=없음, true=참석, false=불참
   bool? _optimisticVote;
+
   /// Optimistic UI: 지각 시 예상 시간 (예: "10분")
   String? _optimisticLateReason;
+
   /// Optimistic UI: 공 가져가기 자원
   bool? _optimisticBallBring;
 
@@ -587,9 +618,9 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     } catch (e) {
       if (mounted) {
         setState(() => _optimisticBallBring = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('반영 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('반영 실패: $e')));
       }
     }
   }
@@ -672,7 +703,10 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                 _doVoteAttendLate(opt);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(12),
@@ -701,19 +735,21 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     });
     try {
       await voteAttend(ref, widget.match, widget.uid!);
-      if (mounted) setState(() {
-        _optimisticVote = null;
-        _optimisticLateReason = null;
-      });
+      if (mounted) {
+        setState(() {
+          _optimisticVote = null;
+          _optimisticLateReason = null;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
           _optimisticVote = null;
           _optimisticLateReason = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('참석 반영 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('참석 반영 실패: $e')));
       }
     }
   }
@@ -725,19 +761,21 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     });
     try {
       await voteAttendLate(ref, widget.match, widget.uid!, lateTime);
-      if (mounted) setState(() {
-        _optimisticVote = null;
-        _optimisticLateReason = null;
-      });
+      if (mounted) {
+        setState(() {
+          _optimisticVote = null;
+          _optimisticLateReason = null;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
           _optimisticVote = null;
           _optimisticLateReason = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('지각 반영 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('지각 반영 실패: $e')));
       }
     }
   }
@@ -752,8 +790,9 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
         builder: (ctx, setDialogState) {
           return AlertDialog(
             backgroundColor: AppTheme.bgCard,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: const Text(
               '불참 사유를 알려주세요',
               style: TextStyle(
@@ -784,23 +823,27 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? AppTheme.teamRed.withValues(alpha:0.2)
+                              ? AppTheme.teamRed.withValues(alpha: 0.2)
                               : AppTheme.surface,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color:
-                                isSelected ? AppTheme.teamRed : AppTheme.divider,
+                            color: isSelected
+                                ? AppTheme.teamRed
+                                : AppTheme.divider,
                             width: 1,
                           ),
                         ),
                         child: Text(
                           reason,
                           style: TextStyle(
-                            color:
-                                isSelected ? AppTheme.teamRed : AppTheme.textSecondary,
+                            color: isSelected
+                                ? AppTheme.teamRed
+                                : AppTheme.textSecondary,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -812,10 +855,16 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: controller,
-                  style: const TextStyle(color: AppTheme.textPrimary, fontSize: 14),
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 14,
+                  ),
                   decoration: InputDecoration(
                     hintText: '직접 입력...',
-                    hintStyle: TextStyle(color: AppTheme.textMuted, fontSize: 14),
+                    hintStyle: TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 14,
+                    ),
                     filled: true,
                     fillColor: AppTheme.surface,
                     border: OutlineInputBorder(
@@ -831,7 +880,9 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                       borderSide: const BorderSide(color: AppTheme.teamRed),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                   ),
                   onChanged: (val) {
                     setDialogState(() => selectedReason = null);
@@ -842,8 +893,10 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child:
-                    const Text('취소', style: TextStyle(color: AppTheme.textMuted)),
+                child: const Text(
+                  '취소',
+                  style: TextStyle(color: AppTheme.textMuted),
+                ),
               ),
               TextButton(
                 onPressed: () async {
@@ -862,15 +915,19 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                   } catch (e) {
                     if (mounted) {
                       setState(() => _optimisticVote = null);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('불참 반영 실패: $e')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('불참 반영 실패: $e')));
                     }
                   }
                 },
-                child: const Text('확인',
-                    style: TextStyle(
-                        color: AppTheme.teamRed, fontWeight: FontWeight.w700)),
+                child: const Text(
+                  '확인',
+                  style: TextStyle(
+                    color: AppTheme.teamRed,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           );
@@ -914,9 +971,15 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     final memberMap = ref.watch(memberMapProvider);
     final allMembers = ref.watch(teamMembersProvider).value ?? [];
 
-    final daysUntil = match.date?.difference(DateTime(
-                DateTime.now().year, DateTime.now().month, DateTime.now().day))
-            .inDays;
+    final daysUntil = match.date
+        ?.difference(
+          DateTime(
+            DateTime.now().year,
+            DateTime.now().month,
+            DateTime.now().day,
+          ),
+        )
+        .inDays;
 
     // 미투표 인원 계산
     final voted = {...attendees, ...absentees};
@@ -929,7 +992,9 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
         color: AppTheme.bgCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: widget.isNext ? AppTheme.teamRed.withValues(alpha:0.4) : AppTheme.divider,
+          color: widget.isNext
+              ? AppTheme.teamRed.withValues(alpha: 0.4)
+              : AppTheme.divider,
           width: widget.isNext ? 1.5 : 1,
         ),
       ),
@@ -1003,7 +1068,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: widget.isNext
-                    ? AppTheme.teamRed.withValues(alpha:0.2)
+                    ? AppTheme.teamRed.withValues(alpha: 0.2)
                     : AppTheme.surface,
                 borderRadius: BorderRadius.circular(6),
               ),
@@ -1011,10 +1076,12 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                 daysUntil == 0
                     ? 'TODAY'
                     : daysUntil == 1
-                        ? 'D-1'
-                        : 'D-$daysUntil',
+                    ? 'D-1'
+                    : 'D-$daysUntil',
                 style: TextStyle(
-                  color: widget.isNext ? AppTheme.teamRed : AppTheme.textSecondary,
+                  color: widget.isNext
+                      ? AppTheme.teamRed
+                      : AppTheme.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.0,
@@ -1101,7 +1168,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surface.withValues(alpha:0.5),
+        color: AppTheme.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.divider, width: 0.5),
       ),
@@ -1136,8 +1203,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     );
   }
 
-  Widget _buildAttendanceBar(
-      int attendCount, int absentCount, int minPlayers) {
+  Widget _buildAttendanceBar(int attendCount, int absentCount, int minPlayers) {
     const totalMembers = 20;
     final progress = attendCount / totalMembers;
     final absentProgress = absentCount / totalMembers;
@@ -1198,7 +1264,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                     child: FractionallySizedBox(
                       widthFactor: absentProgress,
                       child: Container(
-                        color: AppTheme.absentRed.withValues(alpha:0.4),
+                        color: AppTheme.absentRed.withValues(alpha: 0.4),
                       ),
                     ),
                   ),
@@ -1211,7 +1277,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                       gradient: LinearGradient(
                         colors: [
                           AppTheme.attendGreen,
-                          AppTheme.attendGreen.withValues(alpha:0.7),
+                          AppTheme.attendGreen.withValues(alpha: 0.7),
                         ],
                       ),
                     ),
@@ -1219,13 +1285,14 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                 ),
                 // minPlayers 기준선
                 Positioned(
-                  left: minProgress *
+                  left:
+                      minProgress *
                       (MediaQuery.of(context).size.width - 40 - 40),
                   top: 0,
                   bottom: 0,
                   child: Container(
                     width: 2,
-                    color: AppTheme.gold.withValues(alpha:0.8),
+                    color: AppTheme.gold.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -1238,8 +1305,9 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
             _Legend(color: AppTheme.attendGreen, label: '참석 $attendCount'),
             const SizedBox(width: 16),
             _Legend(
-                color: AppTheme.absentRed.withValues(alpha:0.6),
-                label: '불참 $absentCount'),
+              color: AppTheme.absentRed.withValues(alpha: 0.6),
+              label: '불참 $absentCount',
+            ),
             const SizedBox(width: 16),
             _Legend(color: AppTheme.gold, label: '최소 $minPlayers명'),
           ],
@@ -1305,13 +1373,19 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
             runSpacing: 6,
             children: attendeeUids.map((uid) {
               final member = memberMap[uid];
-              final name = member?.uniformName ?? member?.name ?? uid.substring(0, 4);
+              final name =
+                  member?.uniformName ?? member?.name ?? uid.substring(0, 4);
               final number = member?.number;
               final lateLabel = lateReasons[uid];
               final isLateChip = lateLabel != null;
-              final chipColor = isLateChip ? AppTheme.gold : AppTheme.attendGreen;
+              final chipColor = isLateChip
+                  ? AppTheme.gold
+                  : AppTheme.attendGreen;
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: chipColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
@@ -1387,7 +1461,8 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
           runSpacing: 6,
           children: absenteeUids.map((uid) {
             final member = memberMap[uid];
-            final name = member?.uniformName ?? member?.name ?? uid.substring(0, 4);
+            final name =
+                member?.uniformName ?? member?.name ?? uid.substring(0, 4);
             final number = member?.number;
             final reasonData = absenceReasons[uid];
             final reason = reasonData is Map
@@ -1436,10 +1511,7 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     );
   }
 
-  Widget _buildBallBringerSection(
-    Match match,
-    Map<String, Member> memberMap,
-  ) {
+  Widget _buildBallBringerSection(Match match, Map<String, Member> memberMap) {
     final ballBringers = match.ballBringers ?? [];
     final isBringing = widget.uid != null && ballBringers.contains(widget.uid);
     final ballOk = ballBringers.isNotEmpty;
@@ -1531,16 +1603,17 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                   : () => _handleBallBringToggle(match),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: isBringing
                       ? AppTheme.accentLime.withValues(alpha: 0.2)
                       : AppTheme.surface,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isBringing
-                        ? AppTheme.accentLime
-                        : AppTheme.divider,
+                    color: isBringing ? AppTheme.accentLime : AppTheme.divider,
                     width: 1,
                   ),
                 ),
@@ -1548,7 +1621,9 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      isBringing ? Icons.check_circle : Icons.add_circle_outline,
+                      isBringing
+                          ? Icons.check_circle
+                          : Icons.add_circle_outline,
                       size: 16,
                       color: isBringing
                           ? AppTheme.accentLime
@@ -1577,7 +1652,8 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                   runSpacing: 4,
                   children: ballBringers.map((uid) {
                     final m = memberMap[uid];
-                    final name = m?.uniformName ?? m?.name ?? uid.substring(0, 4);
+                    final name =
+                        m?.uniformName ?? m?.name ?? uid.substring(0, 4);
                     return Text(
                       name,
                       style: TextStyle(
@@ -1630,7 +1706,9 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
                           ? (isLate ? Icons.watch_later : Icons.check_circle)
                           : Icons.check_circle_outline,
                       size: 20,
-                      color: attendActive ? Colors.white : AppTheme.textSecondary,
+                      color: attendActive
+                          ? Colors.white
+                          : AppTheme.textSecondary,
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -1670,25 +1748,24 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
               ),
               child: Center(
                 child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isAbsent ? Icons.cancel : Icons.cancel_outlined,
-                            size: 20,
-                            color: isAbsent ? Colors.white : AppTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '불참',
-                            style: TextStyle(
-                              color:
-                                  isAbsent ? Colors.white : AppTheme.textSecondary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isAbsent ? Icons.cancel : Icons.cancel_outlined,
+                      size: 20,
+                      color: isAbsent ? Colors.white : AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '불참',
+                      style: TextStyle(
+                        color: isAbsent ? Colors.white : AppTheme.textSecondary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                       ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

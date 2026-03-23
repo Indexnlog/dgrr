@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../../core/permissions/permission_checker.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../providers/post_providers.dart';
 
 class _DS {
@@ -24,7 +27,8 @@ class PostDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final postAsync = ref.watch(postDetailProvider(postId));
-    final canManage = PermissionChecker.isAdmin(ref) || PermissionChecker.isCoach(ref);
+    final canManage =
+        PermissionChecker.isAdmin(ref) || PermissionChecker.isCoach(ref);
 
     return Scaffold(
       backgroundColor: _DS.bgDeep,
@@ -47,7 +51,10 @@ class PostDetailPage extends ConsumerWidget {
           if (canManage)
             IconButton(
               icon: const Icon(Icons.edit_outlined, color: _DS.textPrimary),
-              onPressed: () => context.push('/home/posts/$postId/edit'),
+              onPressed: () async {
+                await context.push('/home/posts/$postId/edit');
+                ref.invalidate(postDetailProvider(postId));
+              },
               tooltip: '수정',
             ),
         ],
@@ -93,6 +100,43 @@ class PostDetailPage extends ConsumerWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if ((post.category ?? '').isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _DS.teamRed.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          post.category!,
+                          style: const TextStyle(
+                            color: _DS.teamRed,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Text(
+                        _formatPostDate(post.createdAt),
+                        style: TextStyle(
+                          color: _DS.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
                 if (post.content != null && post.content!.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   Container(
@@ -123,13 +167,17 @@ class PostDetailPage extends ConsumerWidget {
             strokeWidth: 2.5,
           ),
         ),
-        error: (e, _) => Center(
-          child: Text(
-            '오류: $e',
-            style: const TextStyle(color: _DS.textSecondary),
-          ),
+        error: (e, _) => ErrorRetryView(
+          message: ErrorHandler.toUserMessage(e, fallback: '공지를 불러오지 못했습니다'),
+          detail: e.toString(),
+          onRetry: () => ref.invalidate(postDetailProvider(postId)),
         ),
       ),
     );
   }
+}
+
+String _formatPostDate(DateTime? dt) {
+  if (dt == null) return '작성일 미상';
+  return DateFormat('yyyy.MM.dd HH:mm', 'ko_KR').format(dt);
 }

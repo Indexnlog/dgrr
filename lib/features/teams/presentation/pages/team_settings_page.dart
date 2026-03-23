@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../../core/permissions/permission_checker.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../providers/current_team_provider.dart';
@@ -28,12 +29,11 @@ class _TeamSettingsPageState extends ConsumerState<TeamSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final teamId = ref.watch(currentTeamIdProvider);
-    final canEdit = PermissionChecker.isAdmin(ref) || PermissionChecker.isCoach(ref);
+    final canEdit =
+        PermissionChecker.isAdmin(ref) || PermissionChecker.isCoach(ref);
 
     if (teamId == null) {
-      return const Scaffold(
-        body: Center(child: Text('팀을 선택해 주세요')),
-      );
+      return const Scaffold(body: Center(child: Text('팀을 선택해 주세요')));
     }
 
     return Scaffold(
@@ -95,18 +95,24 @@ class _TeamSettingsPageState extends ConsumerState<TeamSettingsPage> {
                               await FirebaseFirestore.instance
                                   .collection('teams')
                                   .doc(teamId)
-                                  .update({'name': _nameController.text.trim()});
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('저장되었습니다')),
-                                );
+                                  .update({
+                                    'name': _nameController.text.trim(),
+                                  });
+                              if (!mounted) {
+                                return;
                               }
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(content: Text('저장되었습니다')),
+                              );
                             } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('저장 실패: $e')),
-                                );
+                              if (!mounted) {
+                                return;
                               }
+                              ErrorHandler.showError(
+                                this.context,
+                                e,
+                                fallback: '팀 설정 저장에 실패했습니다',
+                              );
                             } finally {
                               if (mounted) setState(() => _isSaving = false);
                             }

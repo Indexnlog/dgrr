@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../../core/permissions/permission_checker.dart';
 import '../../../../core/widgets/error_retry_view.dart';
@@ -42,26 +43,35 @@ class PollDetailPage extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: _DS.bgDeep,
         foregroundColor: _DS.textPrimary,
-        title: const Text('투표 상세',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        title: const Text(
+          '투표 상세',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
         elevation: 0,
       ),
       body: pollAsync.when(
         data: (poll) {
           if (poll == null) {
             return const Center(
-                child: Text('투표를 찾을 수 없습니다',
-                    style: TextStyle(color: _DS.textSecondary)));
+              child: Text(
+                '투표를 찾을 수 없습니다',
+                style: TextStyle(color: _DS.textSecondary),
+              ),
+            );
           }
           return _PollDetailBody(poll: poll);
         },
         loading: () => const Center(
-            child: CircularProgressIndicator(
-                color: _DS.teamRed, strokeWidth: 2.5)),
+          child: CircularProgressIndicator(
+            color: _DS.teamRed,
+            strokeWidth: 2.5,
+          ),
+        ),
         error: (e, _) => ErrorRetryView(
-            message: '투표를 불러올 수 없습니다',
-            detail: e.toString(),
-            onRetry: () => ref.invalidate(pollDetailProvider(pollId))),
+          message: ErrorHandler.toUserMessage(e, fallback: '투표를 불러올 수 없습니다'),
+          detail: e.toString(),
+          onRetry: () => ref.invalidate(pollDetailProvider(pollId)),
+        ),
       ),
     );
   }
@@ -77,9 +87,11 @@ class _PollDetailBody extends ConsumerStatefulWidget {
 
 class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
   bool _isCreating = false;
+
   /// Optimistic UI: 탭 즉시 반영용
   final Set<String> _optimisticVotes = {};
   final Set<String> _optimisticUnvotes = {};
+
   /// 옵션별 로딩: 저장 중인 옵션 ID
   String? _votingOptionId;
 
@@ -108,9 +120,9 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
       );
       if (events.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('생성할 수업 일정이 없습니다')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('생성할 수업 일정이 없습니다')));
         }
         return;
       }
@@ -127,9 +139,7 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류: $e')),
-        );
+        ErrorHandler.showError(context, e, fallback: '수업 일정 생성 중 오류가 발생했습니다');
       }
     } finally {
       if (mounted) setState(() => _isCreating = false);
@@ -183,7 +193,9 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
             final memberMap = ref.read(memberMapProvider);
             final member = memberMap[uid];
             final userName = member?.uniformName ?? member?.name;
-            await ref.read(registrationDataSourceProvider).upsertMembershipRegistration(
+            await ref
+                .read(registrationDataSourceProvider)
+                .upsertMembershipRegistration(
                   teamId: teamId,
                   seasonId: widget.poll.targetMonth!,
                   userId: uid,
@@ -195,19 +207,19 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
           }
         }
       }
-      if (mounted) setState(() {
-        _optimisticVotes.clear();
-        _optimisticUnvotes.clear();
-      });
+      if (mounted) {
+        setState(() {
+          _optimisticVotes.clear();
+          _optimisticUnvotes.clear();
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
           _optimisticVotes.clear();
           _optimisticUnvotes.clear();
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('투표 반영 실패: $e')),
-        );
+        ErrorHandler.showError(context, e, fallback: '투표 반영에 실패했습니다');
       }
     } finally {
       if (mounted) setState(() => _votingOptionId = null);
@@ -221,8 +233,10 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
     final memberMap = ref.watch(memberMapProvider);
     final isActive = poll.isActive ?? false;
     final options = poll.options ?? [];
-    final totalVotes =
-        options.fold<int>(0, (sum, o) => sum + (o.voteCount ?? 0));
+    final totalVotes = options.fold<int>(
+      0,
+      (sum, o) => sum + (o.voteCount ?? 0),
+    );
     final isMultiSelect = (poll.maxSelections ?? 0) != 1;
 
     return ListView(
@@ -243,46 +257,62 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: isActive
-                          ? _DS.attendGreen.withValues(alpha:0.15)
+                          ? _DS.attendGreen.withValues(alpha: 0.15)
                           : _DS.surface,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(isActive ? '진행중' : '종료',
-                        style: TextStyle(
-                            color: isActive
-                                ? _DS.attendGreen
-                                : _DS.textMuted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700)),
+                    child: Text(
+                      isActive ? '진행중' : '종료',
+                      style: TextStyle(
+                        color: isActive ? _DS.attendGreen : _DS.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  Text(isMultiSelect ? '복수선택' : '단일선택',
-                      style: TextStyle(
-                          color: _DS.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600)),
+                  Text(
+                    isMultiSelect ? '복수선택' : '단일선택',
+                    style: TextStyle(
+                      color: _DS.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const Spacer(),
-                  Text('$totalVotes명 참여',
-                      style: TextStyle(
-                          color: _DS.textSecondary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600)),
+                  Text(
+                    '$totalVotes명 참여',
+                    style: TextStyle(
+                      color: _DS.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
-              Text(poll.title,
-                  style: const TextStyle(
-                      color: _DS.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800)),
+              Text(
+                poll.title,
+                style: const TextStyle(
+                  color: _DS.textPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               if (poll.description != null) ...[
                 const SizedBox(height: 6),
-                Text(poll.description!,
-                    style: const TextStyle(
-                        color: _DS.textSecondary, fontSize: 14)),
+                Text(
+                  poll.description!,
+                  style: const TextStyle(
+                    color: _DS.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
               ],
             ],
           ),
@@ -294,12 +324,15 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
           final isVoted = _optimisticUnvotes.contains(option.id)
               ? false
               : (_optimisticVotes.contains(option.id) || baseVoted);
-          final countDelta = (_optimisticVotes.contains(option.id) ? 1 : 0) -
+          final countDelta =
+              (_optimisticVotes.contains(option.id) ? 1 : 0) -
               (_optimisticUnvotes.contains(option.id) ? 1 : 0);
           final count = (option.voteCount ?? 0) + countDelta;
           final totalWithOptimistic =
               totalVotes + _optimisticVotes.length - _optimisticUnvotes.length;
-          final ratio = totalWithOptimistic > 0 ? count / totalWithOptimistic : 0.0;
+          final ratio = totalWithOptimistic > 0
+              ? count / totalWithOptimistic
+              : 0.0;
           var voters = List<String>.from(option.votes ?? []);
           if (uid != null &&
               _optimisticVotes.contains(option.id) &&
@@ -324,14 +357,15 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: isVoted
-                      ? _DS.gold.withValues(alpha:0.08)
+                      ? _DS.gold.withValues(alpha: 0.08)
                       : _DS.bgCard,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: isVoted
-                          ? _DS.gold.withValues(alpha:0.4)
-                          : _DS.divider,
-                      width: isVoted ? 1.5 : 1),
+                    color: isVoted
+                        ? _DS.gold.withValues(alpha: 0.4)
+                        : _DS.divider,
+                    width: isVoted ? 1.5 : 1,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,18 +377,20 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
                               ? Icons.check_circle
                               : Icons.radio_button_unchecked,
                           size: 20,
-                          color:
-                              isVoted ? _DS.gold : _DS.textMuted,
+                          color: isVoted ? _DS.gold : _DS.textMuted,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(option.text ?? '옵션',
-                              style: TextStyle(
-                                  color: _DS.textPrimary,
-                                  fontSize: 15,
-                                  fontWeight: isVoted
-                                      ? FontWeight.w700
-                                      : FontWeight.w500)),
+                          child: Text(
+                            option.text ?? '옵션',
+                            style: TextStyle(
+                              color: _DS.textPrimary,
+                              fontSize: 15,
+                              fontWeight: isVoted
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
                         ),
                         if (_votingOptionId == option.id)
                           Padding(
@@ -369,13 +405,14 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
                             ),
                           )
                         else
-                          Text('$count명',
-                              style: TextStyle(
-                                  color: isVoted
-                                      ? _DS.gold
-                                      : _DS.textMuted,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700)),
+                          Text(
+                            '$count명',
+                            style: TextStyle(
+                              color: isVoted ? _DS.gold : _DS.textMuted,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -398,15 +435,18 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
                         runSpacing: 4,
                         children: voters.map((voterId) {
                           final member = memberMap[voterId];
-                          final name = member?.uniformName ??
+                          final name =
+                              member?.uniformName ??
                               member?.name ??
-                              voterId.substring(
-                                  0, voterId.length.clamp(0, 4));
-                          return Text(name,
-                              style: TextStyle(
-                                  color: _DS.textMuted,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500));
+                              voterId.substring(0, voterId.length.clamp(0, 4));
+                          return Text(
+                            name,
+                            style: TextStyle(
+                              color: _DS.textMuted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
                         }).toList(),
                       ),
                     ],
@@ -419,25 +459,31 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
         // 출석 투표 → 수업 일정 생성 버튼 (운영진만)
         if (poll.category == PollCategory.attendance &&
             poll.isActive == false &&
-            (PermissionChecker.isAdmin(ref) || PermissionChecker.isCoach(ref))) ...[
+            (PermissionChecker.isAdmin(ref) ||
+                PermissionChecker.isCoach(ref))) ...[
           const SizedBox(height: 20),
           if (poll.linkedEventId != null)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _DS.attendGreen.withValues(alpha:0.15),
+                color: _DS.attendGreen.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: _DS.attendGreen.withValues(alpha:0.4)),
+                border: Border.all(
+                  color: _DS.attendGreen.withValues(alpha: 0.4),
+                ),
               ),
               child: Row(
                 children: [
                   Icon(Icons.check_circle, color: _DS.attendGreen, size: 24),
                   const SizedBox(width: 12),
-                  Text('수업 일정이 이미 생성되었습니다',
-                      style: TextStyle(
-                          color: _DS.attendGreen,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600)),
+                  Text(
+                    '수업 일정이 이미 생성되었습니다',
+                    style: TextStyle(
+                      color: _DS.attendGreen,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             )
@@ -462,7 +508,8 @@ class _PollDetailBodyState extends ConsumerState<_PollDetailBody> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
               ),
             ),

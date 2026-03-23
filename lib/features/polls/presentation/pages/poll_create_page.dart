@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../events/presentation/providers/event_providers.dart';
 import '../../../../core/permissions/permission_checker.dart';
@@ -53,7 +54,8 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
     final year = int.tryParse(monthParts[0]) ?? DateTime.now().year;
     final month = int.tryParse(monthParts[1]) ?? DateTime.now().month;
     final classesAsync = ref.watch(
-        monthlyClassesProvider((year: year, month: month)));
+      monthlyClassesProvider((year: year, month: month)),
+    );
 
     if (!isAdmin) {
       return Scaffold(
@@ -61,8 +63,10 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
         appBar: AppBar(
           backgroundColor: _DS.bgDeep,
           foregroundColor: _DS.textPrimary,
-          title: const Text('투표 만들기',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+          title: const Text(
+            '투표 만들기',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          ),
           elevation: 0,
         ),
         body: const Center(
@@ -79,8 +83,10 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
       appBar: AppBar(
         backgroundColor: _DS.bgDeep,
         foregroundColor: _DS.textPrimary,
-        title: const Text('투표 만들기',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        title: const Text(
+          '투표 만들기',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
         elevation: 0,
       ),
       body: ListView(
@@ -189,11 +195,9 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: isSelected ? _DS.gold.withValues(alpha:0.15) : _DS.bgCard,
+              color: isSelected ? _DS.gold.withValues(alpha: 0.15) : _DS.bgCard,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isSelected ? _DS.gold : _DS.divider,
-              ),
+              border: Border.all(color: isSelected ? _DS.gold : _DS.divider),
             ),
             child: Text(
               label,
@@ -232,13 +236,19 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
                 height: 22,
                 child: Checkbox(
                   value: _excludeHolidays,
-                  onChanged: (v) => setState(() => _excludeHolidays = v ?? true),
+                  onChanged: (v) =>
+                      setState(() => _excludeHolidays = v ?? true),
                   activeColor: _DS.attendGreen,
-                  fillColor: WidgetStateProperty.resolveWith((_) => _DS.textMuted),
+                  fillColor: WidgetStateProperty.resolveWith(
+                    (_) => _DS.textMuted,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              Text('공휴일 제외', style: TextStyle(color: _DS.textPrimary, fontSize: 13)),
+              Text(
+                '공휴일 제외',
+                style: TextStyle(color: _DS.textPrimary, fontSize: 13),
+              ),
             ],
           ),
           Row(
@@ -248,13 +258,19 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
                 height: 22,
                 child: Checkbox(
                   value: _includeFifthWeek,
-                  onChanged: (v) => setState(() => _includeFifthWeek = v ?? true),
+                  onChanged: (v) =>
+                      setState(() => _includeFifthWeek = v ?? true),
                   activeColor: _DS.attendGreen,
-                  fillColor: WidgetStateProperty.resolveWith((_) => _DS.textMuted),
+                  fillColor: WidgetStateProperty.resolveWith(
+                    (_) => _DS.textMuted,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              Text('5번째 목요일 포함', style: TextStyle(color: _DS.textPrimary, fontSize: 13)),
+              Text(
+                '5번째 목요일 포함',
+                style: TextStyle(color: _DS.textPrimary, fontSize: 13),
+              ),
             ],
           ),
         ],
@@ -269,17 +285,18 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
 
     return classesAsync.when(
       data: (classes) {
-        final inRange = classes
-            .where((e) {
-              final d = e.date;
-              if (d == null) return false;
-              final dt = DateTime.tryParse(d);
-              if (dt == null) return false;
-              return dt.year == year && dt.month == month;
-            })
-            .map((e) => e.date!)
-            .toList()
-          ..sort();
+        final inRange =
+            classes
+                .where((e) {
+                  final d = e.date;
+                  if (d == null) return false;
+                  final dt = DateTime.tryParse(d);
+                  if (dt == null) return false;
+                  return dt.year == year && dt.month == month;
+                })
+                .map((e) => e.date!)
+                .toList()
+              ..sort();
 
         List<String> displayDates = inRange;
         String sourceLabel = '기존 수업 일정';
@@ -333,18 +350,22 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
                 runSpacing: 6,
                 children: displayDates.map((d) {
                   final dt = DateTime.tryParse(d);
-                  final label =
-                      dt != null ? DateFormat('M/d (E)', 'ko_KR').format(dt) : d;
+                  final label = dt != null
+                      ? DateFormat('M/d (E)', 'ko_KR').format(dt)
+                      : d;
                   return Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: _DS.surface,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(label,
-                        style: TextStyle(
-                            color: _DS.textSecondary, fontSize: 12)),
+                    child: Text(
+                      label,
+                      style: TextStyle(color: _DS.textSecondary, fontSize: 12),
+                    ),
                   );
                 }).toList(),
               ),
@@ -353,10 +374,11 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
         );
       },
       loading: () => const Center(
-          child: Padding(
-        padding: EdgeInsets.all(20),
-        child: CircularProgressIndicator(strokeWidth: 2),
-      )),
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
@@ -365,7 +387,7 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _DS.surface.withValues(alpha:0.5),
+        color: _DS.surface.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _DS.divider),
       ),
@@ -376,11 +398,14 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
             children: [
               Icon(Icons.info_outline, size: 18, color: _DS.textMuted),
               const SizedBox(width: 8),
-              Text('등록 및 참석 투표 일정',
-                  style: TextStyle(
-                      color: _DS.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600)),
+              Text(
+                '등록 및 참석 투표 일정',
+                style: TextStyle(
+                  color: _DS.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -409,7 +434,8 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
           createdBy: uid,
         );
       } else {
-        var classDates = classesAsync.value
+        var classDates =
+            classesAsync.value
                 ?.where((e) {
                   final d = e.date;
                   if (d == null) return false;
@@ -441,7 +467,8 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                  content: Text('해당 월 수업 일정 후보가 없습니다. 옵션을 조정해 주세요.')),
+                content: Text('해당 월 수업 일정 후보가 없습니다. 옵션을 조정해 주세요.'),
+              ),
             );
           }
           return;
@@ -456,20 +483,20 @@ class _PollCreatePageState extends ConsumerState<PollCreatePage> {
         );
       }
 
-      final pollId =
-          await ref.read(pollDataSourceProvider).createPoll(teamId, poll);
+      final pollId = await ref
+          .read(pollDataSourceProvider)
+          .createPoll(teamId, poll);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('투표가 생성되었습니다.')),
-        );
-        context.go('/schedule/polls/$pollId');
+      if (!mounted) {
+        return;
       }
+      ScaffoldMessenger.of(
+        this.context,
+      ).showSnackBar(const SnackBar(content: Text('투표가 생성되었습니다.')));
+      this.context.go('/schedule/polls/$pollId');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('오류: $e')),
-        );
+        ErrorHandler.showError(this.context, e, fallback: '투표 생성 중 오류가 발생했습니다');
       }
     } finally {
       if (mounted) setState(() => _isCreating = false);
@@ -497,7 +524,7 @@ class _CategoryChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           decoration: BoxDecoration(
-            color: isSelected ? _DS.gold.withValues(alpha:0.12) : _DS.surface,
+            color: isSelected ? _DS.gold.withValues(alpha: 0.12) : _DS.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isSelected ? _DS.gold : Colors.transparent,

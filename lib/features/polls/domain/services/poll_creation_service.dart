@@ -42,7 +42,6 @@ class PollCreationService {
     final parts = targetMonth.split('-');
     final year = int.tryParse(parts[0]) ?? DateTime.now().year;
     final month = int.tryParse(parts[1]) ?? DateTime.now().month;
-    final startAt = DateTime(year, month - 1, 20); // 전월 20일
     final endAt = DateTime(year, month - 1, 24, 23, 59, 59); // 전월 24일
 
     final monthLabel = DateFormat('M월', 'ko_KR').format(DateTime(year, month));
@@ -98,7 +97,6 @@ class PollCreationService {
     final parts = targetMonth.split('-');
     final year = int.tryParse(parts[0]) ?? DateTime.now().year;
     final month = int.tryParse(parts[1]) ?? DateTime.now().month;
-    final startAt = DateTime(year, month - 1, 25); // 전월 25일
     final lastDay = DateTime(year, month, 0).day;
     final endAt = DateTime(year, month - 1, lastDay, 23, 59, 59);
 

@@ -13,6 +13,7 @@ import '../../features/matches/presentation/pages/match_detail_page.dart';
 import '../../features/matches/presentation/pages/match_tab_page.dart';
 import '../../features/opponents/presentation/pages/opponent_list_page.dart';
 import '../../features/mypage/presentation/pages/my_page.dart';
+import '../../features/mypage/presentation/pages/my_fee_status_page.dart';
 import '../../features/mypage/presentation/pages/privacy_policy_page.dart';
 import '../../features/mypage/presentation/pages/terms_page.dart';
 import '../../features/teams/presentation/pages/team_settings_page.dart';
@@ -49,11 +50,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final hasTeam = currentTeamId != null;
       final currentLocation = state.matchedLocation;
 
-      if (!isAuthenticated && currentLocation != '/' && currentLocation != '/welcome') {
+      if (!isAuthenticated &&
+          currentLocation != '/' &&
+          currentLocation != '/welcome') {
         return '/';
       }
 
-      if (isAuthenticated && !hasTeam && currentLocation != '/' && currentLocation != '/welcome') {
+      if (isAuthenticated &&
+          !hasTeam &&
+          currentLocation != '/' &&
+          currentLocation != '/welcome') {
         return '/';
       }
 
@@ -116,7 +122,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'create',
                         name: 'post-create',
-                        builder: (context, state) => const PostCreatePage(),
+                        builder: (context, state) => PostCreatePage(
+                          template: state.uri.queryParameters['template'],
+                          targetMonth: state.uri.queryParameters['month'],
+                          linkedPollId: state.uri.queryParameters['pollId'],
+                        ),
                       ),
                       GoRoute(
                         path: ':postId',
@@ -139,8 +149,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'notifications',
                     name: 'notification-list',
-                    builder: (context, state) =>
-                        const NotificationListPage(),
+                    builder: (context, state) => const NotificationListPage(),
                   ),
                 ],
               ),
@@ -177,8 +186,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                         name: 'reservation-notice-detail',
                         builder: (context, state) =>
                             ReservationNoticeDetailPage(
-                          noticeId: state.pathParameters['noticeId']!,
-                        ),
+                              noticeId: state.pathParameters['noticeId']!,
+                            ),
                       ),
                     ],
                   ),
@@ -190,8 +199,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                       GoRoute(
                         path: 'create',
                         name: 'poll-create',
-                        builder: (context, state) =>
-                            const PollCreatePage(),
+                        builder: (context, state) => const PollCreatePage(),
                       ),
                       GoRoute(
                         path: ':pollId',
@@ -242,16 +250,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 builder: (context, state) => const MyPage(),
                 routes: [
                   GoRoute(
+                    path: 'fee-status',
+                    name: 'my-fee-status',
+                    builder: (context, state) => const MyFeeStatusPage(),
+                  ),
+                  GoRoute(
                     path: 'fees',
                     name: 'fee-management',
-                    builder: (context, state) =>
-                        const FeeManagementPage(),
+                    builder: (context, state) => const FeeManagementPage(),
                   ),
                   GoRoute(
                     path: 'grounds',
                     name: 'ground-management',
-                    builder: (context, state) =>
-                        const GroundManagementPage(),
+                    builder: (context, state) => const GroundManagementPage(),
                   ),
                   GoRoute(
                     path: 'privacy',

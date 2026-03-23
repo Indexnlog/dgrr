@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../../core/permissions/permission_checker.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../domain/entities/poll.dart';
@@ -21,12 +22,29 @@ class _DS {
   static const gold = Color(0xFFFBBF24);
 }
 
-class PollListPage extends ConsumerWidget {
+class PollListPage extends ConsumerStatefulWidget {
   const PollListPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final pollsAsync = ref.watch(allPollsProvider);
+  ConsumerState<PollListPage> createState() => _PollListPageState();
+}
+
+class _PollListPageState extends ConsumerState<PollListPage> {
+  static const int _pageSize = 20;
+  int _pageLimit = _pageSize;
+  bool _isPaging = false;
+
+  void _requestNextPage(int currentCount) {
+    if (_isPaging || currentCount < _pageLimit) return;
+    setState(() {
+      _isPaging = true;
+      _pageLimit += _pageSize;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pollsAsync = ref.watch(allPollsWithLimitProvider(_pageLimit));
     final isAdmin = PermissionChecker.isAdmin(ref);
 
     return Scaffold(
@@ -34,8 +52,10 @@ class PollListPage extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: _DS.bgDeep,
         foregroundColor: _DS.textPrimary,
-        title: const Text('투표',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        title: const Text(
+          '투표',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
         elevation: 0,
         actions: [
           if (isAdmin)
@@ -48,9 +68,20 @@ class PollListPage extends ConsumerWidget {
       ),
       body: pollsAsync.when(
         data: (polls) {
+          if (_isPaging) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _isPaging = false;
+                });
+              }
+            });
+          }
+          final hasMore = polls.length >= _pageLimit;
           if (polls.isEmpty) {
             return RefreshIndicator(
-              onRefresh: () async => ref.invalidate(allPollsProvider),
+              onRefresh: () async =>
+                  ref.invalidate(allPollsWithLimitProvider(_pageLimit)),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
@@ -58,11 +89,16 @@ class PollListPage extends ConsumerWidget {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.ballot_outlined,
-                          size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
+                      Icon(
+                        Icons.ballot_outlined,
+                        size: 48,
+                        color: _DS.textMuted.withValues(alpha: 0.4),
+                      ),
                       const SizedBox(height: 12),
-                      Text('아직 투표가 없습니다',
-                          style: TextStyle(color: _DS.textMuted, fontSize: 14)),
+                      Text(
+                        '아직 투표가 없습니다',
+                        style: TextStyle(color: _DS.textMuted, fontSize: 14),
+                      ),
                     ],
                   ),
                 ],
@@ -70,24 +106,50 @@ class PollListPage extends ConsumerWidget {
             );
           }
           return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(allPollsProvider),
-            child: ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            itemCount: polls.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, index) =>
-                _PollCard(poll: polls[index]),
+            onRefresh: () async =>
+                ref.invalidate(allPollsWithLimitProvider(_pageLimit)),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification.metrics.pixels >=
+                    notification.metrics.maxScrollExtent - 180) {
+                  _requestNextPage(polls.length);
+                }
+                return false;
+              },
+              child: ListView.separated(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                itemCount: polls.length + (hasMore || _isPaging ? 1 : 0),
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  if (index >= polls.length) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: _DS.teamRed,
+                          strokeWidth: 2,
+                        ),
+                      ),
+                    );
+                  }
+                  return _PollCard(poll: polls[index]);
+                },
+              ),
             ),
           );
         },
         loading: () => const Center(
-            child: CircularProgressIndicator(
-                color: _DS.teamRed, strokeWidth: 2.5)),
+          child: CircularProgressIndicator(
+            color: _DS.teamRed,
+            strokeWidth: 2.5,
+          ),
+        ),
         error: (e, _) => ErrorRetryView(
-            message: '투표 목록을 불러올 수 없습니다',
-            detail: e.toString(),
-            onRetry: () => ref.invalidate(allPollsProvider)),
+          message: ErrorHandler.toUserMessage(e, fallback: '투표 목록을 불러올 수 없습니다'),
+          detail: e.toString(),
+          onRetry: () => ref.invalidate(allPollsWithLimitProvider(_pageLimit)),
+        ),
       ),
     );
   }
@@ -100,9 +162,8 @@ class _PollCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = poll.isActive ?? false;
-    final totalVotes = poll.options
-            ?.fold<int>(0, (sum, o) => sum + (o.voteCount ?? 0)) ??
-        0;
+    final totalVotes =
+        poll.options?.fold<int>(0, (sum, o) => sum + (o.voteCount ?? 0)) ?? 0;
 
     return GestureDetector(
       onTap: () => context.push('/schedule/polls/${poll.pollId}'),
@@ -112,9 +173,8 @@ class _PollCard extends StatelessWidget {
           color: _DS.bgCard,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-              color: isActive
-                  ? _DS.gold.withValues(alpha:0.4)
-                  : _DS.divider),
+            color: isActive ? _DS.gold.withValues(alpha: 0.4) : _DS.divider,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,19 +183,22 @@ class _PollCard extends StatelessWidget {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: isActive
-                        ? _DS.attendGreen.withValues(alpha:0.15)
+                        ? _DS.attendGreen.withValues(alpha: 0.15)
                         : _DS.surface,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     isActive ? '진행중' : '종료',
                     style: TextStyle(
-                        color: isActive ? _DS.attendGreen : _DS.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700),
+                      color: isActive ? _DS.attendGreen : _DS.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -143,47 +206,64 @@ class _PollCard extends StatelessWidget {
                   Text(
                     poll.type == PollType.date ? '날짜 투표' : '선택 투표',
                     style: TextStyle(
-                        color: _DS.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600),
+                      color: _DS.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 const Spacer(),
-                Text('$totalVotes명 참여',
-                    style: TextStyle(
-                        color: _DS.textMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500)),
+                Text(
+                  '$totalVotes명 참여',
+                  style: TextStyle(
+                    color: _DS.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
-            Text(poll.title,
-                style: const TextStyle(
-                    color: _DS.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              poll.title,
+              style: const TextStyle(
+                color: _DS.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             if (poll.description != null) ...[
               const SizedBox(height: 4),
-              Text(poll.description!,
-                  style: TextStyle(color: _DS.textSecondary, fontSize: 13),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                poll.description!,
+                style: TextStyle(color: _DS.textSecondary, fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
             const SizedBox(height: 12),
             // 옵션 미리보기
             if (poll.options != null)
-              ...poll.options!.take(3).map((o) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: _OptionPreview(
+              ...poll.options!
+                  .take(3)
+                  .map(
+                    (o) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _OptionPreview(
                         text: o.text ?? '옵션',
                         count: o.voteCount ?? 0,
-                        total: totalVotes > 0 ? totalVotes : 1),
-                  )),
+                        total: totalVotes > 0 ? totalVotes : 1,
+                      ),
+                    ),
+                  ),
             if ((poll.options?.length ?? 0) > 3)
-              Text('외 ${poll.options!.length - 3}개 항목',
-                  style: TextStyle(
-                      color: _DS.textMuted,
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic)),
+              Text(
+                '외 ${poll.options!.length - 3}개 항목',
+                style: TextStyle(
+                  color: _DS.textMuted,
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
           ],
         ),
       ),
@@ -211,14 +291,19 @@ class _OptionPreview extends StatelessWidget {
         Row(
           children: [
             Expanded(
-                child: Text(text,
-                    style: const TextStyle(
-                        color: _DS.textSecondary, fontSize: 12))),
-            Text('$count',
-                style: TextStyle(
-                    color: _DS.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700)),
+              child: Text(
+                text,
+                style: const TextStyle(color: _DS.textSecondary, fontSize: 12),
+              ),
+            ),
+            Text(
+              '$count',
+              style: TextStyle(
+                color: _DS.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),

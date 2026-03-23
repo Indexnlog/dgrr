@@ -72,14 +72,14 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
     try {
       final credential = await ref.read(signInAnonymouslyProvider)();
       final uid = credential.user!.uid;
-      print('[Debug] 익명 로그인 성공: $uid');
+      debugPrint('[Debug] 익명 로그인 성공: $uid');
 
       final firestore = FirebaseFirestore.instance;
 
       // 샘플 팀 시딩 (항상 최신 데이터로 갱신)
       const teamId = 'youngwon_fc';
       await _seedTestData(firestore, teamId);
-      print('[Debug] 샘플 데이터 시딩 완료');
+      debugPrint('[Debug] 샘플 데이터 시딩 완료');
 
       // 멤버십 생성 (active로 바로 진입)
       await firestore
@@ -100,7 +100,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
       await ref.read(currentTeamIdProvider.notifier).selectTeam(teamId);
       _showSnackBar('테스트 로그인 완료! 홈으로 이동합니다.');
     } catch (e) {
-      print('[Debug] 테스트 로그인 실패: $e');
+      debugPrint('[Debug] 테스트 로그인 실패: $e');
       _showSnackBar('테스트 로그인 실패: $e');
     } finally {
       if (mounted) setState(() => _isSigningIn = false);
@@ -234,11 +234,11 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
       _showSnackBar('로그인이 취소되었습니다.');
     } catch (e, stackTrace) {
       // 에러 메시지를 자세히 표시
-      print('=== 로그인 에러 상세 ===');
-      print('에러 타입: ${e.runtimeType}');
-      print('에러 메시지: $e');
-      print('스택 트레이스: $stackTrace');
-      print('==================');
+      debugPrint('=== 로그인 에러 상세 ===');
+      debugPrint('에러 타입: ${e.runtimeType}');
+      debugPrint('에러 메시지: $e');
+      debugPrint('스택 트레이스: $stackTrace');
+      debugPrint('==================');
       
       // 사용자에게 더 명확한 메시지 표시
       String errorMessage = '로그인에 실패했습니다.';

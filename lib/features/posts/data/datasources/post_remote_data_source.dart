@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../core/errors/errors.dart';
 import '../models/post_model.dart';
 
 /// 게시글 Firestore 데이터소스
@@ -18,24 +19,77 @@ class PostRemoteDataSource {
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => PostModel.fromFirestore(doc.id, doc.data()))
-            .toList());
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '공지 목록을 불러오는 중 오류가 발생했습니다',
+          );
+        })
+        .map(
+          (snap) => snap.docs
+              .map((doc) => PostModel.fromFirestore(doc.id, doc.data()))
+              .toList(),
+        );
   }
 
   /// 카테고리별 게시글
-  Stream<List<PostModel>> watchPostsByCategory(
-    String teamId,
-    String category,
-  ) {
+  Stream<List<PostModel>> watchPostsByCategory(String teamId, String category) {
     return _postsRef(teamId)
         .where('category', isEqualTo: category)
         .orderBy('createdAt', descending: true)
         .limit(20)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => PostModel.fromFirestore(doc.id, doc.data()))
-            .toList());
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '카테고리 공지를 불러오는 중 오류가 발생했습니다',
+          );
+        })
+        .map(
+          (snap) => snap.docs
+              .map((doc) => PostModel.fromFirestore(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  /// 공지 게시글 페이지 조회 (생성일 최신순)
+  Future<
+    ({
+      List<PostModel> posts,
+      QueryDocumentSnapshot<Map<String, dynamic>>? lastDoc,
+      bool hasMore,
+    })
+  >
+  fetchNoticePostsPage(
+    String teamId, {
+    QueryDocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int limit = 20,
+  }) async {
+    Query<Map<String, dynamic>> query = _postsRef(teamId)
+        .where('category', isEqualTo: '공지')
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    try {
+      final snap = await query.get();
+      final docs = snap.docs;
+      return (
+        posts: docs
+            .map((d) => PostModel.fromFirestore(d.id, d.data()))
+            .toList(),
+        lastDoc: docs.isNotEmpty ? docs.last : null,
+        hasMore: docs.length == limit,
+      );
+    } catch (error) {
+      throw mapFirebaseException(
+        error,
+        fallbackMessage: '공지 페이지를 불러오는 중 오류가 발생했습니다',
+      );
+    }
   }
 
   /// 단일 게시글 조회
@@ -43,15 +97,26 @@ class PostRemoteDataSource {
     return _postsRef(teamId)
         .doc(postId)
         .snapshots()
-        .map((doc) => doc.exists
-            ? PostModel.fromFirestore(doc.id, doc.data()!)
-            : null);
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '공지 상세를 불러오는 중 오류가 발생했습니다',
+          );
+        })
+        .map(
+          (doc) =>
+              doc.exists ? PostModel.fromFirestore(doc.id, doc.data()!) : null,
+        );
   }
 
   /// 게시글 생성
   Future<String> createPost(String teamId, PostModel post) async {
-    final doc = await _postsRef(teamId).add(post.toFirestore());
-    return doc.id;
+    try {
+      final doc = await _postsRef(teamId).add(post.toFirestore());
+      return doc.id;
+    } catch (error) {
+      throw mapFirebaseException(error, fallbackMessage: '공지 등록 중 오류가 발생했습니다');
+    }
   }
 
   /// 게시글 업데이트
@@ -60,11 +125,19 @@ class PostRemoteDataSource {
     String postId,
     Map<String, dynamic> data,
   ) async {
-    await _postsRef(teamId).doc(postId).update(data);
+    try {
+      await _postsRef(teamId).doc(postId).update(data);
+    } catch (error) {
+      throw mapFirebaseException(error, fallbackMessage: '공지 수정 중 오류가 발생했습니다');
+    }
   }
 
   /// 게시글 삭제
   Future<void> deletePost(String teamId, String postId) async {
-    await _postsRef(teamId).doc(postId).delete();
+    try {
+      await _postsRef(teamId).doc(postId).delete();
+    } catch (error) {
+      throw mapFirebaseException(error, fallbackMessage: '공지 삭제 중 오류가 발생했습니다');
+    }
   }
 }

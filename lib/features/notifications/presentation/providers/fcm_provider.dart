@@ -35,8 +35,7 @@ class FcmService {
 
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
       if (kDebugMode) {
-        // ignore: avoid_print
-        print('[FCM] 알림 권한 거부됨');
+        debugPrint('[FCM] 알림 권한 거부됨');
       }
       return;
     }
@@ -81,29 +80,25 @@ class FcmService {
             fcmToken: token,
           );
       if (kDebugMode) {
-        // ignore: avoid_print
-        print('[FCM] 토큰 저장 완료');
+        debugPrint('[FCM] 토큰 저장 완료');
       }
     } catch (e) {
       if (kDebugMode) {
-        // ignore: avoid_print
-        print('[FCM] 토큰 저장 실패: $e');
+        debugPrint('[FCM] 토큰 저장 실패: $e');
       }
     }
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
     if (kDebugMode) {
-      // ignore: avoid_print
-      print('[FCM] 포그라운드 메시지: ${message.notification?.title}');
+      debugPrint('[FCM] 포그라운드 메시지: ${message.notification?.title}');
     }
     // TODO: 인앱 배너 등 표시 (flutter_local_notifications 활용 가능)
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
     if (kDebugMode) {
-      // ignore: avoid_print
-      print('[FCM] 알림 탭: ${message.data}');
+      debugPrint('[FCM] 알림 탭: ${message.data}');
     }
     final data = message.data;
     if (data.isEmpty) return;
@@ -136,8 +131,7 @@ class FcmService {
         _ref.read(appRouterProvider).go(path);
       } catch (e) {
         if (kDebugMode) {
-          // ignore: avoid_print
-          print('[FCM] 딥링크 이동 실패: $e');
+          debugPrint('[FCM] 딥링크 이동 실패: $e');
         }
       }
     }
@@ -151,8 +145,7 @@ class FcmService {
     } catch (e) {
       // iOS 시뮬레이터: APNS 토큰 미수신 시 getToken() 예외 발생
       if (kDebugMode) {
-        // ignore: avoid_print
-        print('[FCM] 토큰 동기화 건너뜀: $e');
+        debugPrint('[FCM] 토큰 동기화 건너뜀: $e');
       }
     }
   }

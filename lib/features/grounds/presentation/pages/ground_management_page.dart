@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/permissions/permission_checker.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../../teams/domain/entities/member.dart';
 import '../../../teams/presentation/providers/team_members_provider.dart';
 import '../../data/models/ground_model.dart';
@@ -38,8 +39,10 @@ class GroundManagementPage extends ConsumerWidget {
         appBar: AppBar(
           backgroundColor: _DS.bgDeep,
           foregroundColor: _DS.textPrimary,
-          title: const Text('구장 관리',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+          title: const Text(
+            '구장 관리',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+          ),
           elevation: 0,
         ),
         body: const Center(
@@ -56,8 +59,10 @@ class GroundManagementPage extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: _DS.bgDeep,
         foregroundColor: _DS.textPrimary,
-        title: const Text('구장 관리',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        title: const Text(
+          '구장 관리',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
         elevation: 0,
       ),
       body: groundsAsync.when(
@@ -70,11 +75,16 @@ class GroundManagementPage extends ConsumerWidget {
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.stadium_outlined,
-                        size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
+                    Icon(
+                      Icons.stadium_outlined,
+                      size: 48,
+                      color: _DS.textMuted.withValues(alpha: 0.4),
+                    ),
                     const SizedBox(height: 12),
-                    Text('등록된 구장이 없습니다',
-                        style: TextStyle(color: _DS.textMuted, fontSize: 14)),
+                    Text(
+                      '등록된 구장이 없습니다',
+                      style: TextStyle(color: _DS.textMuted, fontSize: 14),
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       '운영진이 구장을 등록해 주세요',
@@ -85,14 +95,19 @@ class GroundManagementPage extends ConsumerWidget {
               ],
             );
           }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            itemCount: grounds.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (_, index) => _GroundCard(
-              ground: grounds[index],
-              memberMap: memberMap,
-              ref: ref,
+          return RefreshIndicator(
+            color: _DS.teamRed,
+            onRefresh: () async => ref.invalidate(allGroundsProvider),
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+              itemCount: grounds.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, index) => _GroundCard(
+                ground: grounds[index],
+                memberMap: memberMap,
+                ref: ref,
+              ),
             ),
           );
         },
@@ -102,9 +117,10 @@ class GroundManagementPage extends ConsumerWidget {
             strokeWidth: 2.5,
           ),
         ),
-        error: (e, _) => Center(
-          child: Text('오류: $e',
-              style: const TextStyle(color: _DS.textSecondary)),
+        error: (e, _) => ErrorRetryView(
+          message: '구장 정보를 불러오지 못했어요',
+          detail: e.toString(),
+          onRetry: () => ref.invalidate(allGroundsProvider),
         ),
       ),
     );
@@ -126,7 +142,9 @@ class _GroundCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isActive = ground.active ?? true;
     final managerNames = (ground.managers ?? [])
-        .map((uid) => memberMap[uid]?.uniformName ?? memberMap[uid]?.name ?? uid)
+        .map(
+          (uid) => memberMap[uid]?.uniformName ?? memberMap[uid]?.name ?? uid,
+        )
         .join(', ');
 
     return Container(
@@ -145,7 +163,7 @@ class _GroundCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: isActive
-                      ? _DS.attendGreen.withValues(alpha:0.15)
+                      ? _DS.attendGreen.withValues(alpha: 0.15)
                       : _DS.surface,
                   borderRadius: BorderRadius.circular(6),
                 ),

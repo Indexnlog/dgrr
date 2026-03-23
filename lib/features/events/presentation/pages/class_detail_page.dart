@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../teams/domain/entities/member.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_members_provider.dart';
 import '../../domain/entities/event.dart';
 import '../providers/event_providers.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 
 class _DS {
   _DS._();
@@ -40,16 +42,20 @@ class ClassDetailPage extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: _DS.bgDeep,
         foregroundColor: _DS.textPrimary,
-        title: const Text('수업 상세',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        title: const Text(
+          '수업 상세',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
         elevation: 0,
       ),
       body: eventAsync.when(
         data: (event) {
           if (event == null) {
             return const Center(
-              child: Text('수업을 찾을 수 없습니다',
-                  style: TextStyle(color: _DS.textSecondary)),
+              child: Text(
+                '수업을 찾을 수 없습니다',
+                style: TextStyle(color: _DS.textSecondary),
+              ),
             );
           }
           return _ClassDetailBody(
@@ -59,10 +65,15 @@ class ClassDetailPage extends ConsumerWidget {
           );
         },
         loading: () => const Center(
-          child: CircularProgressIndicator(color: _DS.teamRed, strokeWidth: 2.5),
+          child: CircularProgressIndicator(
+            color: _DS.teamRed,
+            strokeWidth: 2.5,
+          ),
         ),
-        error: (e, _) => Center(
-          child: Text('오류: $e', style: const TextStyle(color: _DS.absentRed)),
+        error: (e, _) => ErrorRetryView(
+          message: ErrorHandler.toUserMessage(e, fallback: '수업 정보를 불러오지 못했어요'),
+          detail: e.toString(),
+          onRetry: () => ref.invalidate(classDetailProvider(eventId)),
         ),
       ),
     );
@@ -92,11 +103,18 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
     setState(() => _isVoting = true);
 
     final teamId = ref.read(currentTeamIdProvider);
-    if (teamId == null) return;
+    if (teamId == null) {
+      if (mounted) {
+        setState(() => _isVoting = false);
+      }
+      return;
+    }
 
     final member = widget.memberMap[widget.uid];
     try {
-      await ref.read(eventDataSourceProvider).updateAttendeeStatus(
+      await ref
+          .read(eventDataSourceProvider)
+          .updateAttendeeStatus(
             teamId: teamId,
             eventId: widget.event.eventId,
             userId: widget.uid!,
@@ -105,6 +123,10 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
             status: status,
             reason: reason,
           );
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.showError(context, e, fallback: '출석 상태 변경 중 오류가 발생했습니다');
+      }
     } finally {
       if (mounted) setState(() => _isVoting = false);
     }
@@ -116,43 +138,47 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: _DS.bgCard,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: const Text('지각 예상 시간',
-            style: TextStyle(
-                color: _DS.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          '지각 예상 시간',
+          style: TextStyle(
+            color: _DS.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: options
-              .map((opt) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _handleVote(AttendeeStatus.late, reason: opt);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _DS.surface,
-                          foregroundColor: _DS.textPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+              .map(
+                (opt) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _handleVote(AttendeeStatus.late, reason: opt);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _DS.surface,
+                        foregroundColor: _DS.textPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Text(opt),
                       ),
+                      child: Text(opt),
                     ),
-                  ))
+                  ),
+                ),
+              )
               .toList(),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소',
-                style: TextStyle(color: _DS.textMuted)),
+            child: const Text('취소', style: TextStyle(color: _DS.textMuted)),
           ),
         ],
       ),
@@ -170,12 +196,16 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
           return AlertDialog(
             backgroundColor: _DS.bgCard,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-            title: const Text('불참 사유',
-                style: TextStyle(
-                    color: _DS.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700)),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              '불참 사유',
+              style: TextStyle(
+                color: _DS.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -193,22 +223,26 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? _DS.teamRed.withValues(alpha:0.2)
+                              ? _DS.teamRed.withValues(alpha: 0.2)
                               : _DS.surface,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                              color: isSelected ? _DS.teamRed : _DS.divider),
+                            color: isSelected ? _DS.teamRed : _DS.divider,
+                          ),
                         ),
-                        child: Text(r,
-                            style: TextStyle(
-                                color: isSelected
-                                    ? _DS.teamRed
-                                    : _DS.textSecondary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600)),
+                        child: Text(
+                          r,
+                          style: TextStyle(
+                            color: isSelected ? _DS.teamRed : _DS.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     );
                   }).toList(),
@@ -216,25 +250,28 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: controller,
-                  style:
-                      const TextStyle(color: _DS.textPrimary, fontSize: 14),
+                  style: const TextStyle(color: _DS.textPrimary, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: '직접 입력...',
-                    hintStyle:
-                        TextStyle(color: _DS.textMuted, fontSize: 14),
+                    hintStyle: TextStyle(color: _DS.textMuted, fontSize: 14),
                     filled: true,
                     fillColor: _DS.surface,
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: _DS.divider)),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: _DS.divider),
+                    ),
                     enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: _DS.divider)),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: _DS.divider),
+                    ),
                     focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: _DS.teamRed)),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: _DS.teamRed),
+                    ),
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                   ),
                   onChanged: (val) =>
                       setDialogState(() => selectedReason = null),
@@ -244,8 +281,7 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('취소',
-                    style: TextStyle(color: _DS.textMuted)),
+                child: const Text('취소', style: TextStyle(color: _DS.textMuted)),
               ),
               TextButton(
                 onPressed: () {
@@ -254,9 +290,13 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
                   Navigator.pop(ctx);
                   _handleVote(AttendeeStatus.absent, reason: reason);
                 },
-                child: const Text('확인',
-                    style: TextStyle(
-                        color: _DS.teamRed, fontWeight: FontWeight.w700)),
+                child: const Text(
+                  '확인',
+                  style: TextStyle(
+                    color: _DS.teamRed,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ],
           );
@@ -276,14 +316,18 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
         .map((a) => a.status)
         .firstOrNull;
 
-    final attending =
-        attendees.where((a) => a.status == AttendeeStatus.attending).toList();
-    final late_ =
-        attendees.where((a) => a.status == AttendeeStatus.late).toList();
-    final attended =
-        attendees.where((a) => a.status == AttendeeStatus.attended).toList();
-    final absent =
-        attendees.where((a) => a.status == AttendeeStatus.absent).toList();
+    final attending = attendees
+        .where((a) => a.status == AttendeeStatus.attending)
+        .toList();
+    final late_ = attendees
+        .where((a) => a.status == AttendeeStatus.late)
+        .toList();
+    final attended = attendees
+        .where((a) => a.status == AttendeeStatus.attended)
+        .toList();
+    final absent = attendees
+        .where((a) => a.status == AttendeeStatus.absent)
+        .toList();
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -300,11 +344,11 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
           _buildVoteButtons(myStatus),
           const SizedBox(height: 20),
         ],
-        _buildAttendeeSection(
-          isFinished ? '출석' : '참석',
-          [...attending, ...late_, ...attended],
-          _DS.attendGreen,
-        ),
+        _buildAttendeeSection(isFinished ? '출석' : '참석', [
+          ...attending,
+          ...late_,
+          ...attended,
+        ], _DS.attendGreen),
         if (absent.isNotEmpty) ...[
           const SizedBox(height: 12),
           _buildAttendeeSection('불참', absent, _DS.absentRed),
@@ -318,11 +362,14 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Center(
-              child: Text('수업 종료',
-                  style: TextStyle(
-                      color: _DS.textMuted,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600)),
+              child: Text(
+                '수업 종료',
+                style: TextStyle(
+                  color: _DS.textMuted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -348,28 +395,36 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: _DS.fixedBlue.withValues(alpha:0.15),
+                  color: _DS.fixedBlue.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text('수업',
-                    style: TextStyle(
-                        color: _DS.fixedBlue,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700)),
+                child: const Text(
+                  '수업',
+                  style: TextStyle(
+                    color: _DS.fixedBlue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               const Spacer(),
               _StatusBadge(status: event.status),
             ],
           ),
           const SizedBox(height: 14),
-          Text(event.title ?? '정기 수업',
-              style: const TextStyle(
-                  color: _DS.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800)),
+          Text(
+            event.title ?? '정기 수업',
+            style: const TextStyle(
+              color: _DS.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 14),
           _InfoRow(icon: Icons.calendar_today_outlined, text: dateStr),
           const SizedBox(height: 8),
@@ -391,8 +446,7 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
       ),
       child: Row(
         children: [
-          _SummaryCell(
-              label: '참석', count: attending, color: _DS.attendGreen),
+          _SummaryCell(label: '참석', count: attending, color: _DS.attendGreen),
           Container(width: 1, height: 36, color: _DS.divider),
           _SummaryCell(label: '지각', count: late_, color: _DS.gold),
           Container(width: 1, height: 36, color: _DS.divider),
@@ -459,11 +513,14 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
           children: [
             Container(width: 3, height: 14, color: color),
             const SizedBox(width: 8),
-            Text('$label ${attendees.length}명',
-                style: TextStyle(
-                    color: color,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              '$label ${attendees.length}명',
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -472,36 +529,47 @@ class _ClassDetailBodyState extends ConsumerState<_ClassDetailBody> {
           runSpacing: 6,
           children: attendees.map((a) {
             return Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: color.withValues(alpha:0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withValues(alpha:0.25), width: 0.5),
+                border: Border.all(
+                  color: color.withValues(alpha: 0.25),
+                  width: 0.5,
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (a.number != null) ...[
-                    Text('#${a.number}',
-                        style: TextStyle(
-                            color: color.withValues(alpha:0.7),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700)),
+                    Text(
+                      '#${a.number}',
+                      style: TextStyle(
+                        color: color.withValues(alpha: 0.7),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     const SizedBox(width: 4),
                   ],
-                  Text(a.userName ?? '알 수 없음',
-                      style: const TextStyle(
-                          color: _DS.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600)),
+                  Text(
+                    a.userName ?? '알 수 없음',
+                    style: const TextStyle(
+                      color: _DS.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   if (a.reason != null) ...[
                     const SizedBox(width: 4),
-                    Text('(${a.reason})',
-                        style: TextStyle(
-                            color: _DS.textMuted,
-                            fontSize: 10,
-                            fontStyle: FontStyle.italic)),
+                    Text(
+                      '(${a.reason})',
+                      style: TextStyle(
+                        color: _DS.textMuted,
+                        fontSize: 10,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -530,12 +598,17 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha:0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(label,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
@@ -551,8 +624,10 @@ class _InfoRow extends StatelessWidget {
       children: [
         Icon(icon, size: 16, color: _DS.textMuted),
         const SizedBox(width: 8),
-        Text(text,
-            style: const TextStyle(color: _DS.textSecondary, fontSize: 14)),
+        Text(
+          text,
+          style: const TextStyle(color: _DS.textSecondary, fontSize: 14),
+        ),
       ],
     );
   }
@@ -573,15 +648,23 @@ class _SummaryCell extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Text('$count',
-              style: TextStyle(
-                  color: color, fontSize: 22, fontWeight: FontWeight.w800)),
+          Text(
+            '$count',
+            style: TextStyle(
+              color: color,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label,
-              style: TextStyle(
-                  color: _DS.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: TextStyle(
+              color: _DS.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -619,7 +702,9 @@ class _VoteButton extends StatelessWidget {
             color: isActive ? color : _DS.surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-                color: isActive ? color : _DS.divider, width: 1.5),
+              color: isActive ? color : _DS.divider,
+              width: 1.5,
+            ),
           ),
           child: Center(
             child: isLoading
@@ -627,21 +712,27 @@ class _VoteButton extends StatelessWidget {
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: _DS.textPrimary))
+                      strokeWidth: 2,
+                      color: _DS.textPrimary,
+                    ),
+                  )
                 : Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(isActive ? activeIcon : icon,
-                          size: 18,
-                          color: isActive ? Colors.white : _DS.textSecondary),
+                      Icon(
+                        isActive ? activeIcon : icon,
+                        size: 18,
+                        color: isActive ? Colors.white : _DS.textSecondary,
+                      ),
                       const SizedBox(width: 6),
-                      Text(label,
-                          style: TextStyle(
-                              color: isActive
-                                  ? Colors.white
-                                  : _DS.textSecondary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700)),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: isActive ? Colors.white : _DS.textSecondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ],
                   ),
           ),

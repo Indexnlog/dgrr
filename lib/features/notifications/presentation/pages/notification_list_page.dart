@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
@@ -90,7 +91,7 @@ class NotificationListPage extends ConsumerWidget {
           ),
         ),
         error: (e, _) => ErrorRetryView(
-          message: '알림을 불러올 수 없습니다',
+          message: ErrorHandler.toUserMessage(e, fallback: '알림을 불러올 수 없습니다'),
           detail: e.toString(),
           onRetry: () => ref.invalidate(myNotificationsProvider),
         ),
@@ -107,16 +108,18 @@ class _NotificationTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUserProvider)?.uid;
     final teamId = ref.watch(currentTeamIdProvider);
-    final isUnread = uid != null && !(notification.readBy?.contains(uid) ?? false);
+    final isUnread =
+        uid != null && !(notification.readBy?.contains(uid) ?? false);
 
     return GestureDetector(
       onTap: () async {
         if (uid != null && teamId != null) {
-          await ref.read(notificationDataSourceProvider).markAsRead(
-                teamId,
-                notification.notificationId,
-                uid,
-              );
+          await ref
+              .read(notificationDataSourceProvider)
+              .markAsRead(teamId, notification.notificationId, uid);
+        }
+        if (!context.mounted) {
+          return;
         }
         _navigateToRelated(context, notification);
       },
@@ -171,10 +174,7 @@ class _NotificationTile extends ConsumerWidget {
                   const SizedBox(height: 6),
                   Text(
                     _formatDate(notification.createdAt),
-                    style: TextStyle(
-                      color: AppTheme.textMuted,
-                      fontSize: 11,
-                    ),
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
                   ),
                 ],
               ),

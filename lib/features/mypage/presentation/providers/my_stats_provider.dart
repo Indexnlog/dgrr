@@ -25,7 +25,9 @@ String formatTenure(DateTime? joinedAt) {
 final recentFinishedMatchesProvider =
     StreamProvider<List<MatchModel>>((ref) {
   final teamId = ref.watch(currentTeamIdProvider);
-  if (teamId == null) return const Stream.empty();
+  if (teamId == null) {
+    return const Stream.empty();
+  }
 
   return ref.watch(matchDataSourceProvider).watchRecentFinishedMatches(teamId);
 });

@@ -1,10 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
+import '../../../../core/errors/error_handler.dart';
 import '../../../../core/permissions/permission_checker.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../data/models/post_model.dart';
+import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../providers/post_providers.dart';
 
 class _DS {
@@ -20,13 +24,154 @@ class _DS {
 }
 
 /// 공지 목록 페이지
-class PostListPage extends ConsumerWidget {
+class PostListPage extends ConsumerStatefulWidget {
   const PostListPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final postsAsync = ref.watch(recentPostsProvider);
-    final canManage = PermissionChecker.isAdmin(ref) || PermissionChecker.isCoach(ref);
+  ConsumerState<PostListPage> createState() => _PostListPageState();
+}
+
+class _PostListPageState extends ConsumerState<PostListPage> {
+  final TextEditingController _searchController = TextEditingController();
+  final List<PostModel> _posts = [];
+  final Set<String> _postIds = {};
+  QueryDocumentSnapshot<Map<String, dynamic>>? _lastDoc;
+  bool _isInitialLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  String? _errorMessage;
+  String? _errorDetail;
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadInitial();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadInitial() async {
+    final teamId = ref.read(currentTeamIdProvider);
+    if (teamId == null) {
+      setState(() {
+        _isInitialLoading = false;
+        _errorMessage = '팀 정보가 없습니다';
+        _errorDetail = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isInitialLoading = true;
+      _errorMessage = null;
+      _errorDetail = null;
+      _posts.clear();
+      _postIds.clear();
+      _lastDoc = null;
+      _hasMore = true;
+    });
+
+    try {
+      final result = await ref
+          .read(postDataSourceProvider)
+          .fetchNoticePostsPage(teamId, limit: 20);
+      if (!mounted) return;
+      setState(() {
+        _posts.clear();
+        _postIds.clear();
+        for (final post in result.posts) {
+          if (_postIds.add(post.postId)) {
+            _posts.add(post);
+          }
+        }
+        _sortPosts();
+        _lastDoc = result.lastDoc;
+        _hasMore = result.hasMore;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = ErrorHandler.toUserMessage(
+          e,
+          fallback: '공지를 불러오지 못했습니다',
+        );
+        _errorDetail = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitialLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore || _lastDoc == null) return;
+    final teamId = ref.read(currentTeamIdProvider);
+    if (teamId == null) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+    try {
+      final result = await ref
+          .read(postDataSourceProvider)
+          .fetchNoticePostsPage(teamId, startAfter: _lastDoc, limit: 20);
+      if (!mounted) return;
+      setState(() {
+        for (final post in result.posts) {
+          if (_postIds.add(post.postId)) {
+            _posts.add(post);
+          }
+        }
+        _sortPosts();
+        _lastDoc = result.lastDoc;
+        _hasMore = result.hasMore && result.posts.isNotEmpty;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    }
+  }
+
+  void _sortPosts() {
+    _posts.sort((a, b) {
+      final pinnedCompare = (b.isPinned == true ? 1 : 0).compareTo(
+        a.isPinned == true ? 1 : 0,
+      );
+      if (pinnedCompare != 0) {
+        return pinnedCompare;
+      }
+
+      final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canManage =
+        PermissionChecker.isAdmin(ref) || PermissionChecker.isCoach(ref);
+    final filteredPosts = _searchQuery.isEmpty
+        ? _posts
+        : _posts.where((post) {
+            final title = post.title.toLowerCase();
+            final content = (post.content ?? '').toLowerCase();
+            return title.contains(_searchQuery) ||
+                content.contains(_searchQuery);
+          }).toList();
 
     return Scaffold(
       backgroundColor: _DS.bgDeep,
@@ -49,75 +194,184 @@ class PostListPage extends ConsumerWidget {
           if (canManage)
             IconButton(
               icon: const Icon(Icons.add, color: _DS.textPrimary),
-              onPressed: () => context.push('/home/posts/create'),
+              onPressed: () async {
+                await context.push('/home/posts/create');
+                if (mounted) {
+                  _loadInitial();
+                }
+              },
               tooltip: '공지 작성',
             ),
         ],
       ),
-      body: postsAsync.when(
-        data: (posts) {
-          if (posts.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: () async => ref.invalidate(recentPostsProvider),
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
-                children: [
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.campaign_outlined, color: _DS.textMuted, size: 48),
-                      const SizedBox(height: 12),
-                      Text(
-                        '등록된 공지가 없습니다',
-                        style: TextStyle(color: _DS.textSecondary, fontSize: 15),
-                      ),
-                    ],
-                  ),
-                ],
+      body: _isInitialLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: _DS.teamRed,
+                strokeWidth: 2.5,
               ),
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(recentPostsProvider),
-            child: ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            itemCount: posts.length,
-            itemBuilder: (context, index) {
-              final post = posts[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _PostCard(post: post),
-              );
-            },
+            )
+          : _errorMessage != null
+          ? ErrorRetryView(
+              message: _errorMessage!,
+              detail: _errorDetail,
+              onRetry: _loadInitial,
+            )
+          : RefreshIndicator(
+              onRefresh: _loadInitial,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                itemCount:
+                    (filteredPosts.isEmpty ? 1 : filteredPosts.length) +
+                    ((_isLoadingMore || (!_hasMore && filteredPosts.isNotEmpty))
+                        ? 1
+                        : 0),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    final searchWidget = Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value.trim().toLowerCase();
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: '공지 제목/내용 검색',
+                          hintStyle: TextStyle(
+                            color: _DS.textMuted,
+                            fontSize: 13,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: _DS.textMuted,
+                            size: 20,
+                          ),
+                          filled: true,
+                          fillColor: _DS.bgCard,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: _DS.divider),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: _DS.divider),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: _DS.teamRed,
+                              width: 1.4,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                        ),
+                        style: const TextStyle(
+                          color: _DS.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                    );
+
+                    if (filteredPosts.isNotEmpty) {
+                      return searchWidget;
+                    }
+
+                    return Column(
+                      children: [
+                        searchWidget,
+                        Padding(
+                          padding: const EdgeInsets.only(top: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _posts.isEmpty
+                                    ? Icons.campaign_outlined
+                                    : Icons.search_off_rounded,
+                                color: _DS.textMuted,
+                                size: 48,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                _posts.isEmpty ? '등록된 공지가 없습니다' : '검색 결과가 없습니다',
+                                style: TextStyle(
+                                  color: _DS.textSecondary,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+
+                  final listIndex = index - 1;
+                  if (listIndex >= filteredPosts.length) {
+                    if (_isLoadingMore) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: _DS.teamRed,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      );
+                    }
+                    if (!_hasMore && filteredPosts.isNotEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Center(
+                          child: Text(
+                            '모든 공지를 확인했어요',
+                            style: TextStyle(
+                              color: _DS.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                  }
+
+                  if (listIndex == filteredPosts.length - 1 && _hasMore) {
+                    _loadMore();
+                  }
+
+                  final post = filteredPosts[listIndex];
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: listIndex == filteredPosts.length - 1 ? 0 : 12,
+                    ),
+                    child: _PostCard(post: post, onOpened: _loadInitial),
+                  );
+                },
+              ),
             ),
-          );
-        },
-        loading: () => const Center(
-          child: CircularProgressIndicator(
-            color: _DS.teamRed,
-            strokeWidth: 2.5,
-          ),
-        ),
-        error: (e, _) => ErrorRetryView(
-          message: '공지를 불러오지 못했습니다',
-          detail: e.toString(),
-          onRetry: () => ref.invalidate(recentPostsProvider),
-        ),
-      ),
     );
   }
 }
 
 class _PostCard extends ConsumerWidget {
-  const _PostCard({required this.post});
+  const _PostCard({required this.post, required this.onOpened});
   final PostModel post;
+  final Future<void> Function() onOpened;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
-      onTap: () => context.push('/home/posts/${post.postId}'),
+      onTap: () async {
+        await context.push('/home/posts/${post.postId}');
+        await onOpened();
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -150,14 +404,48 @@ class _PostCard extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       post.content!,
-                      style: TextStyle(
-                        color: _DS.textMuted,
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: _DS.textMuted, fontSize: 13),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if ((post.category ?? '').isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _DS.teamRed.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            post.category!,
+                            style: const TextStyle(
+                              color: _DS.teamRed,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Expanded(
+                        child: Text(
+                          _formatPostDate(post.createdAt),
+                          style: TextStyle(
+                            color: _DS.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -167,4 +455,9 @@ class _PostCard extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _formatPostDate(DateTime? dt) {
+  if (dt == null) return '작성일 미상';
+  return DateFormat('yyyy.MM.dd HH:mm', 'ko_KR').format(dt);
 }

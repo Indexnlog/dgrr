@@ -72,13 +72,13 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
           }
           return _buildBody(match, roundsAsync);
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: _C.red),
-        ),
+        loading: () =>
+            const Center(child: CircularProgressIndicator(color: _C.red)),
         error: (e, _) => ErrorRetryView(
-          message: '경기를 불러올 수 없습니다',
+          message: ErrorHandler.toUserMessage(e, fallback: '경기를 불러올 수 없습니다'),
           detail: e.toString(),
-          onRetry: () => ref.invalidate(matchDetailProvider(widget.matchId))),
+          onRetry: () => ref.invalidate(matchDetailProvider(widget.matchId)),
+        ),
       ),
       floatingActionButton: matchAsync.value != null
           ? _buildFab(matchAsync.value!)
@@ -90,7 +90,11 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
     if (match.date == null) return null;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final matchDay = DateTime(match.date!.year, match.date!.month, match.date!.day);
+    final matchDay = DateTime(
+      match.date!.year,
+      match.date!.month,
+      match.date!.day,
+    );
     return matchDay.difference(today).inDays;
   }
 
@@ -107,10 +111,7 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
         const SizedBox(height: 12),
         _BallBringerChip(match: match),
         const SizedBox(height: 16),
-        _GameControlBar(
-          match: match,
-          matchId: widget.matchId,
-        ),
+        _GameControlBar(match: match, matchId: widget.matchId),
         const SizedBox(height: 20),
         _LineupSection(match: match, matchId: widget.matchId),
         const SizedBox(height: 20),
@@ -156,7 +157,14 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
           loading: () => const Center(
             child: CircularProgressIndicator(color: _C.red, strokeWidth: 2),
           ),
-          error: (e, _) => Text('$e', style: const TextStyle(color: _C.sub)),
+          error: (e, _) => ErrorRetryView(
+            message: ErrorHandler.toUserMessage(
+              e,
+              fallback: '라운드 정보를 불러오지 못했습니다',
+            ),
+            detail: e.toString(),
+            onRetry: () => ref.invalidate(matchRoundsProvider(widget.matchId)),
+          ),
         ),
       ],
     );
@@ -190,11 +198,20 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
         : 0;
     final dataSource = ref.read(roundRecordDataSourceProvider);
 
-    final lineupUids = match.lineup ?? match.participants ?? match.attendees ?? [];
-    final lineupMembers = lineupUids.map((id) => memberMap[id]).whereType<Member>().toList();
+    final lineupUids =
+        match.lineup ?? match.participants ?? match.attendees ?? [];
+    final lineupMembers = lineupUids
+        .map((id) => memberMap[id])
+        .whereType<Member>()
+        .toList();
     final quickGoalMembers = lineupMembers.isEmpty ? allMembers : lineupMembers;
 
-    final fieldResult = ref.read(currentFieldPlayersProvider((matchId: widget.matchId, roundId: round.roundId)));
+    final fieldResult = ref.read(
+      currentFieldPlayersProvider((
+        matchId: widget.matchId,
+        roundId: round.roundId,
+      )),
+    );
     final fieldMembers = (fieldResult?.fieldUids ?? [])
         .map((id) => memberMap[id])
         .whereType<Member>()
@@ -216,7 +233,8 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
           children: [
             const SizedBox(height: 12),
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: _C.muted,
                 borderRadius: BorderRadius.circular(2),
@@ -225,8 +243,14 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
             const SizedBox(height: 20),
             ListTile(
               leading: const Icon(Icons.sports_soccer, color: _C.green),
-              title: const Text('골 (빠른 기록)', style: TextStyle(color: _C.text, fontWeight: FontWeight.w600)),
-              subtitle: const Text('득점자 1탭', style: TextStyle(color: _C.sub, fontSize: 12)),
+              title: const Text(
+                '골 (빠른 기록)',
+                style: TextStyle(color: _C.text, fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                '득점자 1탭',
+                style: TextStyle(color: _C.sub, fontSize: 12),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 showQuickGoalSheet(
@@ -243,8 +267,14 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
             ),
             ListTile(
               leading: const Icon(Icons.swap_horiz, color: _C.blue),
-              title: const Text('교체 (빠른 기록)', style: TextStyle(color: _C.text, fontWeight: FontWeight.w600)),
-              subtitle: const Text('OUT → IN 선택', style: TextStyle(color: _C.sub, fontSize: 12)),
+              title: const Text(
+                '교체 (빠른 기록)',
+                style: TextStyle(color: _C.text, fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                'OUT → IN 선택',
+                style: TextStyle(color: _C.sub, fontSize: 12),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 showQuickSubstitutionSheet(
@@ -262,8 +292,14 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
             ),
             ListTile(
               leading: Icon(Icons.sports, color: _C.muted),
-              title: const Text('상대팀 골', style: TextStyle(color: _C.text, fontWeight: FontWeight.w600)),
-              subtitle: const Text('+1 즉시 기록', style: TextStyle(color: _C.sub, fontSize: 12)),
+              title: const Text(
+                '상대팀 골',
+                style: TextStyle(color: _C.text, fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                '+1 즉시 기록',
+                style: TextStyle(color: _C.sub, fontSize: 12),
+              ),
               onTap: () async {
                 Navigator.pop(ctx);
                 try {
@@ -277,7 +313,10 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
                   );
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('상대팀 골 기록'), backgroundColor: _C.green),
+                      const SnackBar(
+                        content: Text('상대팀 골 기록'),
+                        backgroundColor: _C.green,
+                      ),
                     );
                   }
                 } catch (e) {
@@ -287,11 +326,26 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
                 }
               },
             ),
-            const Divider(color: _C.divider, height: 1, indent: 16, endIndent: 16),
+            const Divider(
+              color: _C.divider,
+              height: 1,
+              indent: 16,
+              endIndent: 16,
+            ),
             ListTile(
               leading: const Icon(Icons.edit, color: _C.muted, size: 20),
-              title: const Text('득점 기록 (상세)', style: TextStyle(color: _C.sub, fontWeight: FontWeight.w600, fontSize: 13)),
-              subtitle: const Text('골 / 도움 / 자책골', style: TextStyle(color: _C.muted, fontSize: 11)),
+              title: const Text(
+                '득점 기록 (상세)',
+                style: TextStyle(
+                  color: _C.sub,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              subtitle: const Text(
+                '골 / 도움 / 자책골',
+                style: TextStyle(color: _C.muted, fontSize: 11),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 showGoalRecordModal(
@@ -308,8 +362,18 @@ class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
             ),
             ListTile(
               leading: const Icon(Icons.edit, color: _C.muted, size: 20),
-              title: const Text('교체 기록 (상세)', style: TextStyle(color: _C.sub, fontWeight: FontWeight.w600, fontSize: 13)),
-              subtitle: const Text('IN / OUT 선수 선택', style: TextStyle(color: _C.muted, fontSize: 11)),
+              title: const Text(
+                '교체 기록 (상세)',
+                style: TextStyle(
+                  color: _C.sub,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              subtitle: const Text(
+                'IN / OUT 선수 선택',
+                style: TextStyle(color: _C.muted, fontSize: 11),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 showSubstitutionRecordModal(
@@ -345,10 +409,14 @@ class _DDayBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
-        color: isToday ? _C.red.withValues(alpha:0.15) : _C.muted.withValues(alpha:0.2),
+        color: isToday
+            ? _C.red.withValues(alpha: 0.15)
+            : _C.muted.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isToday ? _C.red.withValues(alpha:0.5) : _C.muted.withValues(alpha:0.3),
+          color: isToday
+              ? _C.red.withValues(alpha: 0.5)
+              : _C.muted.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -373,7 +441,11 @@ class _DDayBanner extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               '오늘 경기입니다!',
-              style: TextStyle(color: _C.red.withValues(alpha:0.9), fontSize: 14, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: _C.red.withValues(alpha: 0.9),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ],
@@ -415,22 +487,39 @@ class _LineupSection extends ConsumerWidget {
             children: [
               const Text(
                 '라인업',
-                style: TextStyle(color: _C.text, fontSize: 16, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: _C.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const Spacer(),
               if (canEdit)
                 GestureDetector(
-                  onTap: () => showLineupEditSheet(context, match: match, matchId: matchId),
+                  onTap: () => showLineupEditSheet(
+                    context,
+                    match: match,
+                    matchId: matchId,
+                  ),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: _C.green.withValues(alpha:0.15),
+                      color: _C.green.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _C.green.withValues(alpha:0.4)),
+                      border: Border.all(
+                        color: _C.green.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: const Text(
                       '라인업 설정',
-                      style: TextStyle(color: _C.green, fontSize: 12, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        color: _C.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -488,7 +577,14 @@ class _LineupRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: _C.sub, fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: const TextStyle(
+            color: _C.sub,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         const SizedBox(height: 6),
         Wrap(
           spacing: 8,
@@ -520,7 +616,10 @@ class _LineupRow extends StatelessWidget {
                     ),
                   ),
                   if (isCaptain)
-                    const Text(' (주장)', style: TextStyle(color: _C.green, fontSize: 11)),
+                    const Text(
+                      ' (주장)',
+                      style: TextStyle(color: _C.green, fontSize: 11),
+                    ),
                 ],
               ),
             );
@@ -558,18 +657,37 @@ class _MatchInfoCard extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('VS', style: TextStyle(color: _C.muted, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 4)),
+              Text(
+                'VS',
+                style: TextStyle(
+                  color: _C.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 4,
+                ),
+              ),
               if (canEdit) ...[
                 const Spacer(),
                 GestureDetector(
-                  onTap: () => _showOpponentEditDialog(context, ref, match, matchId),
+                  onTap: () =>
+                      _showOpponentEditDialog(context, ref, match, matchId),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: _C.muted.withValues(alpha:0.2),
+                      color: _C.muted.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text('상대팀 수정', style: TextStyle(color: _C.sub, fontSize: 11, fontWeight: FontWeight.w600)),
+                    child: const Text(
+                      '상대팀 수정',
+                      style: TextStyle(
+                        color: _C.sub,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -578,7 +696,11 @@ class _MatchInfoCard extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             match.opponentName ?? '상대 미정',
-            style: const TextStyle(color: _C.text, fontSize: 24, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: _C.text,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           const SizedBox(height: 16),
           Row(
@@ -596,12 +718,21 @@ class _MatchInfoCard extends ConsumerWidget {
     );
   }
 
-  Future<void> _showOpponentEditDialog(BuildContext context, WidgetRef ref, Match match, String matchId) async {
+  Future<void> _showOpponentEditDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Match match,
+    String matchId,
+  ) async {
     final teamId = ref.read(currentTeamIdProvider);
     if (teamId == null) return;
 
-    final nameController = TextEditingController(text: match.opponent?.name ?? '');
-    final contactController = TextEditingController(text: match.opponent?.contact ?? '');
+    final nameController = TextEditingController(
+      text: match.opponent?.name ?? '',
+    );
+    final contactController = TextEditingController(
+      text: match.opponent?.contact ?? '',
+    );
     var status = match.opponent?.status ?? 'seeking';
 
     final result = await showDialog<bool>(
@@ -616,7 +747,10 @@ class _MatchInfoCard extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('상대팀명', style: TextStyle(color: _C.sub, fontSize: 12)),
+                const Text(
+                  '상대팀명',
+                  style: TextStyle(color: _C.sub, fontSize: 12),
+                ),
                 const SizedBox(height: 4),
                 TextField(
                   controller: nameController,
@@ -624,11 +758,16 @@ class _MatchInfoCard extends ConsumerWidget {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: _C.surface,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('연락처', style: TextStyle(color: _C.sub, fontSize: 12)),
+                const Text(
+                  '연락처',
+                  style: TextStyle(color: _C.sub, fontSize: 12),
+                ),
                 const SizedBox(height: 4),
                 TextField(
                   controller: contactController,
@@ -636,7 +775,9 @@ class _MatchInfoCard extends ConsumerWidget {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: _C.surface,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -644,16 +785,29 @@ class _MatchInfoCard extends ConsumerWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _StatusChip(label: '모집 중', value: 'seeking', selected: status == 'seeking', onTap: () => setState(() => status = 'seeking')),
+                    _StatusChip(
+                      label: '모집 중',
+                      value: 'seeking',
+                      selected: status == 'seeking',
+                      onTap: () => setState(() => status = 'seeking'),
+                    ),
                     const SizedBox(width: 8),
-                    _StatusChip(label: '확정', value: 'confirmed', selected: status == 'confirmed', onTap: () => setState(() => status = 'confirmed')),
+                    _StatusChip(
+                      label: '확정',
+                      value: 'confirmed',
+                      selected: status == 'confirmed',
+                      onTap: () => setState(() => status = 'confirmed'),
+                    ),
                   ],
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소', style: TextStyle(color: _C.muted))),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소', style: TextStyle(color: _C.muted)),
+            ),
             TextButton(
               onPressed: () {
                 if (nameController.text.trim().isEmpty) return;
@@ -668,26 +822,37 @@ class _MatchInfoCard extends ConsumerWidget {
 
     if (result == true && nameController.text.trim().isNotEmpty) {
       try {
-        await ref.read(matchDataSourceProvider).updateOpponent(
-          teamId,
-          matchId,
-          name: nameController.text.trim(),
-          contact: contactController.text.trim().isEmpty ? null : contactController.text.trim(),
-          status: status,
-        );
+        await ref
+            .read(matchDataSourceProvider)
+            .updateOpponent(
+              teamId,
+              matchId,
+              name: nameController.text.trim(),
+              contact: contactController.text.trim().isEmpty
+                  ? null
+                  : contactController.text.trim(),
+              status: status,
+            );
         final opponentId = match.opponent?.teamId;
         if (opponentId != null) {
-          await ref.read(opponentDataSourceProvider).updateOpponent(
-            teamId,
-            opponentId,
-            name: nameController.text.trim(),
-            contact: contactController.text.trim().isEmpty ? null : contactController.text.trim(),
-            status: status,
-          );
+          await ref
+              .read(opponentDataSourceProvider)
+              .updateOpponent(
+                teamId,
+                opponentId,
+                name: nameController.text.trim(),
+                contact: contactController.text.trim().isEmpty
+                    ? null
+                    : contactController.text.trim(),
+                status: status,
+              );
         }
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('상대팀 정보가 수정되었습니다'), backgroundColor: _C.green),
+            const SnackBar(
+              content: Text('상대팀 정보가 수정되었습니다'),
+              backgroundColor: _C.green,
+            ),
           );
         }
       } catch (e) {
@@ -700,7 +865,12 @@ class _MatchInfoCard extends ConsumerWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label, required this.value, required this.selected, required this.onTap});
+  const _StatusChip({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.onTap,
+  });
   final String label;
   final String value;
   final bool selected;
@@ -713,11 +883,19 @@ class _StatusChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? _C.green.withValues(alpha:0.15) : _C.muted.withValues(alpha:0.2),
+          color: selected
+              ? _C.green.withValues(alpha: 0.15)
+              : _C.muted.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: selected ? _C.green : _C.divider),
         ),
-        child: Text(label, style: TextStyle(color: selected ? _C.green : _C.sub, fontWeight: FontWeight.w600)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? _C.green : _C.sub,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
@@ -741,8 +919,16 @@ class _InfoChip extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: _C.sub),
           const SizedBox(width: 5),
-          Text(label, style: const TextStyle(color: _C.sub, fontSize: 11, fontWeight: FontWeight.w500),
-               maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(
+            label,
+            style: const TextStyle(
+              color: _C.sub,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -773,9 +959,7 @@ class _BallBringerChip extends ConsumerWidget {
             decoration: BoxDecoration(
               color: isBringing ? _C.green.withValues(alpha: 0.15) : _C.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isBringing ? _C.green : _C.divider,
-              ),
+              border: Border.all(color: isBringing ? _C.green : _C.divider),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -838,7 +1022,8 @@ class _GameControlBar extends ConsumerWidget {
       child: Row(
         children: [
           Container(
-            width: 8, height: 8,
+            width: 8,
+            height: 8,
             decoration: BoxDecoration(
               color: switch (gameStatus) {
                 GameStatus.notStarted => _C.muted,
@@ -855,7 +1040,11 @@ class _GameControlBar extends ConsumerWidget {
               GameStatus.playing => '경기 진행 중',
               GameStatus.finished => '경기 종료',
             },
-            style: const TextStyle(color: _C.text, fontSize: 14, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: _C.text,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const Spacer(),
           if (gameStatus == GameStatus.notStarted)
@@ -865,8 +1054,22 @@ class _GameControlBar extends ConsumerWidget {
               onTap: () async {
                 final teamId = ref.read(currentTeamIdProvider);
                 if (teamId == null) return;
-                await ref.read(roundRecordDataSourceProvider).startMatch(teamId, matchId);
-                await ref.read(matchDataSourceProvider).syncParticipantsFromAttendees(teamId, matchId);
+                try {
+                  await ref
+                      .read(roundRecordDataSourceProvider)
+                      .startMatch(teamId, matchId);
+                  await ref
+                      .read(matchDataSourceProvider)
+                      .syncParticipantsFromAttendees(teamId, matchId);
+                } catch (e) {
+                  if (context.mounted) {
+                    ErrorHandler.showError(
+                      context,
+                      e,
+                      fallback: '경기 시작 처리에 실패했습니다',
+                    );
+                  }
+                }
               },
             ),
           if (gameStatus == GameStatus.playing)
@@ -878,51 +1081,96 @@ class _GameControlBar extends ConsumerWidget {
                   context: context,
                   builder: (ctx) => AlertDialog(
                     backgroundColor: _C.card,
-                    title: const Text('경기 종료', style: TextStyle(color: _C.text)),
-                    content: const Text('경기를 종료하시겠습니까?', style: TextStyle(color: _C.sub)),
+                    title: const Text(
+                      '경기 종료',
+                      style: TextStyle(color: _C.text),
+                    ),
+                    content: const Text(
+                      '경기를 종료하시겠습니까?',
+                      style: TextStyle(color: _C.sub),
+                    ),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소', style: TextStyle(color: _C.muted))),
-                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('종료', style: TextStyle(color: _C.red))),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text(
+                          '취소',
+                          style: TextStyle(color: _C.muted),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text(
+                          '종료',
+                          style: TextStyle(color: _C.red),
+                        ),
+                      ),
                     ],
                   ),
                 );
                 if (confirm == true) {
                   final teamId = ref.read(currentTeamIdProvider);
                   if (teamId == null) return;
-                  await ref.read(roundRecordDataSourceProvider).endMatch(teamId, matchId);
+                  try {
+                    await ref
+                        .read(roundRecordDataSourceProvider)
+                        .endMatch(teamId, matchId);
 
-                  final opponentId = match.opponent?.teamId;
-                  if (opponentId != null) {
-                    final rounds = ref.read(matchRoundsProvider(matchId)).value ?? [];
-                    var ourTotal = 0;
-                    var oppTotal = 0;
-                    for (final r in rounds) {
-                      ourTotal += r.ourScore ?? 0;
-                      oppTotal += r.oppScore ?? 0;
+                    final opponentId = match.opponent?.teamId;
+                    if (opponentId != null) {
+                      final rounds =
+                          ref.read(matchRoundsProvider(matchId)).value ?? [];
+                      var ourTotal = 0;
+                      var oppTotal = 0;
+                      for (final r in rounds) {
+                        ourTotal += r.ourScore ?? 0;
+                        oppTotal += r.oppScore ?? 0;
+                      }
+                      final result = ourTotal > oppTotal
+                          ? 'W'
+                          : ourTotal < oppTotal
+                          ? 'L'
+                          : 'D';
+                      final oppDs = ref.read(opponentDataSourceProvider);
+                      final current = await oppDs.getOpponent(
+                        teamId,
+                        opponentId,
+                      );
+                      final rec = current?.records ?? const OpponentRecords();
+                      final newRec = OpponentRecords(
+                        wins: rec.wins + (result == 'W' ? 1 : 0),
+                        draws: rec.draws + (result == 'D' ? 1 : 0),
+                        losses: rec.losses + (result == 'L' ? 1 : 0),
+                      );
+                      final recent = [...?current?.recentResults];
+                      recent.insert(0, result);
+                      if (recent.length > 10) recent.removeLast();
+                      await oppDs.updateRecords(
+                        teamId,
+                        opponentId,
+                        recentResults: recent,
+                        records: newRec,
+                      );
                     }
-                    final result = ourTotal > oppTotal ? 'W' : ourTotal < oppTotal ? 'L' : 'D';
-                    final oppDs = ref.read(opponentDataSourceProvider);
-                    final current = await oppDs.getOpponent(teamId, opponentId);
-                    final rec = current?.records ?? const OpponentRecords();
-                    final newRec = OpponentRecords(
-                      wins: rec.wins + (result == 'W' ? 1 : 0),
-                      draws: rec.draws + (result == 'D' ? 1 : 0),
-                      losses: rec.losses + (result == 'L' ? 1 : 0),
-                    );
-                    final recent = [...?current?.recentResults];
-                    recent.insert(0, result);
-                    if (recent.length > 10) recent.removeLast();
-                    await oppDs.updateRecords(teamId, opponentId, recentResults: recent, records: newRec);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ErrorHandler.showError(
+                        context,
+                        e,
+                        fallback: '경기 종료 처리에 실패했습니다',
+                      );
+                    }
                   }
                 }
               },
             ),
           if (gameStatus == GameStatus.finished &&
-              (PermissionChecker.isTreasurer(ref) || PermissionChecker.isAdmin(ref)))
+              (PermissionChecker.isTreasurer(ref) ||
+                  PermissionChecker.isAdmin(ref)))
             _ActionButton(
               label: '경비 정산',
               color: _C.gold,
-              onTap: () => showMatchExpenseSettlementSheet(context, match: match),
+              onTap: () =>
+                  showMatchExpenseSettlementSheet(context, match: match),
             ),
         ],
       ),
@@ -931,7 +1179,11 @@ class _GameControlBar extends ConsumerWidget {
 }
 
 class _ActionButton extends StatelessWidget {
-  const _ActionButton({required this.label, required this.color, required this.onTap});
+  const _ActionButton({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
   final String label;
   final Color color;
   final VoidCallback onTap;
@@ -943,11 +1195,18 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: color.withValues(alpha:0.15),
+          color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha:0.4)),
+          border: Border.all(color: color.withValues(alpha: 0.4)),
         ),
-        child: Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -967,21 +1226,36 @@ class _AddRoundButton extends ConsumerWidget {
         if (teamId == null) return;
         final rounds = ref.read(matchRoundsProvider(matchId)).value ?? [];
         final nextIndex = rounds.length + 1;
-        await ref.read(roundRecordDataSourceProvider).createRound(teamId, matchId, nextIndex);
+        try {
+          await ref
+              .read(roundRecordDataSourceProvider)
+              .createRound(teamId, matchId, nextIndex);
+        } catch (e) {
+          if (context.mounted) {
+            ErrorHandler.showError(context, e, fallback: '라운드 추가에 실패했습니다');
+          }
+        }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: _C.blue.withValues(alpha:0.12),
+          color: _C.blue.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _C.blue.withValues(alpha:0.3)),
+          border: Border.all(color: _C.blue.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.add, size: 14, color: _C.blue),
             const SizedBox(width: 4),
-            Text('라운드 추가', style: TextStyle(color: _C.blue, fontSize: 12, fontWeight: FontWeight.w600)),
+            Text(
+              '라운드 추가',
+              style: TextStyle(
+                color: _C.blue,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -1006,7 +1280,9 @@ class _RoundCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recordsAsync = ref.watch(roundRecordsProvider((matchId: matchId, roundId: round.roundId)));
+    final recordsAsync = ref.watch(
+      roundRecordsProvider((matchId: matchId, roundId: round.roundId)),
+    );
     final recordCount = recordsAsync.whenOrNull(data: (r) => r.length) ?? 0;
 
     final statusLabel = switch (round.status) {
@@ -1027,7 +1303,9 @@ class _RoundCard extends ConsumerWidget {
         color: _C.card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: round.status == RoundStatus.playing ? _C.green.withValues(alpha:0.4) : _C.divider,
+          color: round.status == RoundStatus.playing
+              ? _C.green.withValues(alpha: 0.4)
+              : _C.divider,
         ),
       ),
       child: Column(
@@ -1041,21 +1319,40 @@ class _RoundCard extends ConsumerWidget {
                 children: [
                   Text(
                     '${round.roundIndex ?? 0}쿼터',
-                    style: const TextStyle(color: _C.text, fontSize: 15, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: _C.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha:0.15),
+                      color: statusColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w700)),
+                    child: Text(
+                      statusLabel,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Text(
                     '${round.ourScore ?? 0} - ${round.oppScore ?? 0}',
-                    style: const TextStyle(color: _C.text, fontSize: 14, fontWeight: FontWeight.w800, fontFamily: 'monospace'),
+                    style: const TextStyle(
+                      color: _C.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      fontFamily: 'monospace',
+                    ),
                   ),
                   if (recordCount > 0) ...[
                     const SizedBox(width: 8),
@@ -1072,7 +1369,19 @@ class _RoundCard extends ConsumerWidget {
                       onTap: () async {
                         final teamId = ref.read(currentTeamIdProvider);
                         if (teamId == null) return;
-                        await ref.read(roundRecordDataSourceProvider).startRound(teamId, matchId, round.roundId);
+                        try {
+                          await ref
+                              .read(roundRecordDataSourceProvider)
+                              .startRound(teamId, matchId, round.roundId);
+                        } catch (e) {
+                          if (context.mounted) {
+                            ErrorHandler.showError(
+                              context,
+                              e,
+                              fallback: '라운드 시작에 실패했습니다',
+                            );
+                          }
+                        }
                       },
                     ),
                   if (round.status == RoundStatus.playing)
@@ -1082,13 +1391,26 @@ class _RoundCard extends ConsumerWidget {
                       onTap: () async {
                         final teamId = ref.read(currentTeamIdProvider);
                         if (teamId == null) return;
-                        await ref.read(roundRecordDataSourceProvider).endRound(teamId, matchId, round.roundId);
+                        try {
+                          await ref
+                              .read(roundRecordDataSourceProvider)
+                              .endRound(teamId, matchId, round.roundId);
+                        } catch (e) {
+                          if (context.mounted) {
+                            ErrorHandler.showError(
+                              context,
+                              e,
+                              fallback: '라운드 종료에 실패했습니다',
+                            );
+                          }
+                        }
                       },
                     ),
                   const SizedBox(width: 8),
                   Icon(
                     isExpanded ? Icons.expand_less : Icons.expand_more,
-                    color: _C.muted, size: 20,
+                    color: _C.muted,
+                    size: 20,
                   ),
                 ],
               ),
@@ -1105,7 +1427,11 @@ class _RoundCard extends ConsumerWidget {
 }
 
 class _RoundActionChip extends StatelessWidget {
-  const _RoundActionChip({required this.label, required this.color, required this.onTap});
+  const _RoundActionChip({
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
   final String label;
   final Color color;
   final VoidCallback onTap;
@@ -1117,11 +1443,18 @@ class _RoundActionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withValues(alpha:0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color.withValues(alpha:0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
-        child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
@@ -1146,24 +1479,34 @@ class _RecordTimeline extends ConsumerWidget {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 20),
             child: Center(
-              child: Text('아직 기록이 없습니다', style: TextStyle(color: _C.muted, fontSize: 12)),
+              child: Text(
+                '아직 기록이 없습니다',
+                style: TextStyle(color: _C.muted, fontSize: 12),
+              ),
             ),
           );
         }
         return Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
           child: Column(
-            children: records.map((record) => _RecordRow(record: record)).toList(),
+            children: records
+                .map((record) => _RecordRow(record: record))
+                .toList(),
           ),
         );
       },
       loading: () => const Padding(
         padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: _C.sub)),
+        child: Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: _C.sub),
+        ),
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(16),
-        child: Text('$e', style: const TextStyle(color: _C.sub, fontSize: 12)),
+        child: Text(
+          ErrorHandler.toUserMessage(e, fallback: '기록을 불러오지 못했습니다'),
+          style: const TextStyle(color: _C.sub, fontSize: 12),
+        ),
       ),
     );
   }
@@ -1183,15 +1526,13 @@ class _RecordRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final (icon, iconColor, description) = switch (record) {
       GoalRecord r => (
-        r.isOwnGoal == true ? Icons.sentiment_very_dissatisfied : Icons.sports_soccer,
+        r.isOwnGoal == true
+            ? Icons.sentiment_very_dissatisfied
+            : Icons.sports_soccer,
         r.isOwnGoal == true ? _C.red : _C.green,
         _goalDescription(r),
       ),
-      SubstitutionRecord r => (
-        Icons.swap_horiz,
-        _C.blue,
-        _subDescription(r),
-      ),
+      SubstitutionRecord r => (Icons.swap_horiz, _C.blue, _subDescription(r)),
       _ => (Icons.circle, _C.muted, '알 수 없는 기록'),
     };
 
@@ -1204,13 +1545,19 @@ class _RecordRow extends StatelessWidget {
             width: 42,
             child: Text(
               _formatTime(record.timeOffset),
-              style: TextStyle(color: _C.muted, fontSize: 11, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
+              style: TextStyle(
+                color: _C.muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'monospace',
+              ),
             ),
           ),
           Container(
-            width: 24, height: 24,
+            width: 24,
+            height: 24,
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha:0.15),
+              color: iconColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 14, color: iconColor),
@@ -1219,7 +1566,11 @@ class _RecordRow extends StatelessWidget {
           Expanded(
             child: Text(
               description,
-              style: const TextStyle(color: _C.text, fontSize: 13, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                color: _C.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -1230,7 +1581,9 @@ class _RecordRow extends StatelessWidget {
   String _goalDescription(GoalRecord r) {
     final scorer = r.playerName ?? '미정';
     final number = r.playerNumber != null ? '#${r.playerNumber} ' : '';
-    final assist = r.assistPlayerName != null ? ' (도움: ${r.assistPlayerName})' : '';
+    final assist = r.assistPlayerName != null
+        ? ' (도움: ${r.assistPlayerName})'
+        : '';
     if (r.isOwnGoal == true) return '$number$scorer 자책골';
     return '$number$scorer 득점$assist';
   }
@@ -1255,7 +1608,15 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(title, style: const TextStyle(color: _C.sub, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.5)),
+        Text(
+          title,
+          style: const TextStyle(
+            color: _C.sub,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.5,
+          ),
+        ),
         const Spacer(),
         if (trailing != null) trailing!,
       ],
@@ -1274,7 +1635,7 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Column(
         children: [
-          Icon(icon, size: 40, color: _C.muted.withValues(alpha:0.5)),
+          Icon(icon, size: 40, color: _C.muted.withValues(alpha: 0.5)),
           const SizedBox(height: 12),
           Text(message, style: TextStyle(color: _C.muted, fontSize: 13)),
         ],

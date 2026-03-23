@@ -14,6 +14,7 @@ import '../../../teams/domain/entities/member.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_members_provider.dart';
 import '../../../teams/presentation/providers/user_role_provider.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../domain/entities/fee.dart';
 import '../providers/fee_providers.dart';
 import '../widgets/fee_create_sheet.dart';
@@ -44,8 +45,10 @@ class FeeManagementPage extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: _DS.bgDeep,
         foregroundColor: _DS.textPrimary,
-        title: const Text('회비 관리',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+        title: const Text(
+          '회비 관리',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
         elevation: 0,
         actions: [
           if (ref.watch(hasPermissionProvider(Permission.treasurer)))
@@ -57,42 +60,64 @@ class FeeManagementPage extends ConsumerWidget {
       ),
       body: feesAsync.when(
         data: (fees) {
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            children: [
-              _NextMonthRegistrationDraftCard(),
-              const SizedBox(height: 16),
-              _CurrentMonthRegistrationCard(),
-              if (fees.isEmpty) ...[
-                const SizedBox(height: 20),
-                Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.account_balance_wallet_outlined,
-                      size: 48, color: _DS.textMuted.withValues(alpha:0.4)),
+          return RefreshIndicator(
+            color: _DS.teamRed,
+            onRefresh: () async {
+              ref.invalidate(allFeesProvider);
+              ref.invalidate(currentMonthRegistrationsProvider);
+            },
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+              children: [
+                _NextMonthRegistrationDraftCard(),
+                const SizedBox(height: 16),
+                _CurrentMonthRegistrationCard(),
+                if (fees.isEmpty) ...[
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.account_balance_wallet_outlined,
+                          size: 48,
+                          color: _DS.textMuted.withValues(alpha: 0.4),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          '회비 설정이 없습니다',
+                          style: TextStyle(color: _DS.textMuted, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
                   const SizedBox(height: 12),
-                  Text('회비 설정이 없습니다',
-                      style: TextStyle(color: _DS.textMuted, fontSize: 14)),
+                  ...fees.map(
+                    (f) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _FeeCard(fee: f),
+                    ),
+                  ),
                 ],
-              ),
-            ),
-          ] else ...[
-                const SizedBox(height: 12),
-                ...fees.map((f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _FeeCard(fee: f),
-                )),
               ],
-            ],
+            ),
           );
         },
         loading: () => const Center(
-            child: CircularProgressIndicator(
-                color: _DS.teamRed, strokeWidth: 2.5)),
-        error: (e, _) => Center(
-            child: Text('오류: $e',
-                style: const TextStyle(color: _DS.textSecondary))),
+          child: CircularProgressIndicator(
+            color: _DS.teamRed,
+            strokeWidth: 2.5,
+          ),
+        ),
+        error: (e, _) => ErrorRetryView(
+          message: '회비 데이터를 불러오지 못했어요',
+          detail: e.toString(),
+          onRetry: () {
+            ref.invalidate(allFeesProvider);
+            ref.invalidate(currentMonthRegistrationsProvider);
+          },
+        ),
       ),
     );
   }
@@ -105,7 +130,8 @@ class _NextMonthRegistrationDraftCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final nextMonthPollAsync = ref.watch(nextMonthMembershipPollProvider);
-    final hasPermission = ref.watch(hasPermissionProvider(Permission.treasurer)) ||
+    final hasPermission =
+        ref.watch(hasPermissionProvider(Permission.treasurer)) ||
         ref.watch(hasPermissionProvider(Permission.admin));
     final teamId = ref.watch(currentTeamIdProvider);
     final uid = ref.watch(currentUserProvider)?.uid;
@@ -135,7 +161,10 @@ class _NextMonthRegistrationDraftCard extends ConsumerWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: _DS.gold.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
@@ -164,30 +193,59 @@ class _NextMonthRegistrationDraftCard extends ConsumerWidget {
               if (existingPoll != null) ...[
                 Text(
                   '등록 투표가 이미 생성되었습니다. (20일~24일 투표 기간)',
-                  style: TextStyle(
-                    color: _DS.textSecondary,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: _DS.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 12),
                 TextButton.icon(
-                  onPressed: () => context.push('/schedule/polls/${existingPoll.pollId}'),
-                  icon: const Icon(Icons.ballot_outlined, size: 18, color: _DS.gold),
+                  onPressed: () =>
+                      context.push('/schedule/polls/${existingPoll.pollId}'),
+                  icon: const Icon(
+                    Icons.ballot_outlined,
+                    size: 18,
+                    color: _DS.gold,
+                  ),
                   label: const Text(
                     '투표 보기',
-                    style: TextStyle(color: _DS.gold, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: _DS.gold,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: () => context.push(
+                    '/home/posts/create?template=registration&month=$nextMonth&pollId=${existingPoll.pollId}',
+                  ),
+                  icon: const Icon(
+                    Icons.campaign_outlined,
+                    size: 18,
+                    color: _DS.attendGreen,
+                  ),
+                  label: const Text(
+                    '공지 초안 작성',
+                    style: TextStyle(
+                      color: _DS.attendGreen,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ] else ...[
                 Text(
                   '매월 20일~24일 회원들이 다음 달 등록/휴회/미등록을 선택합니다. 초안을 생성하세요.',
-                  style: TextStyle(
-                    color: _DS.textSecondary,
-                    fontSize: 13,
-                  ),
+                  style: TextStyle(color: _DS.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 12),
-                _CreateDraftButton(teamId: teamId, uid: uid, nextMonth: nextMonth),
+                _CreateDraftButton(
+                  teamId: teamId,
+                  uid: uid,
+                  nextMonth: nextMonth,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '투표 생성 후 공지 초안을 바로 작성할 수 있어요.',
+                  style: TextStyle(color: _DS.textMuted, fontSize: 12),
+                ),
               ],
             ],
           ),
@@ -242,9 +300,9 @@ class _CreateDraftButtonState extends ConsumerState<_CreateDraftButton> {
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('생성 실패: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('생성 실패: $e')));
                 }
               } finally {
                 if (mounted) setState(() => _isCreating = false);
@@ -254,7 +312,10 @@ class _CreateDraftButtonState extends ConsumerState<_CreateDraftButton> {
           ? const SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: _DS.bgDeep),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: _DS.bgDeep,
+              ),
             )
           : const Icon(Icons.add_circle_outline, size: 18),
       label: Text(_isCreating ? '생성 중...' : '등록 투표 초안 생성'),
@@ -304,18 +365,24 @@ class _CurrentMonthRegistrationCard extends ConsumerWidget {
                   color: _DS.attendGreen.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text('이번 달',
-                    style: TextStyle(
-                        color: _DS.attendGreen,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700)),
+                child: const Text(
+                  '이번 달',
+                  style: TextStyle(
+                    color: _DS.attendGreen,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
-              Text(seasonLabel,
-                  style: const TextStyle(
-                      color: _DS.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700)),
+              Text(
+                seasonLabel,
+                style: const TextStyle(
+                  color: _DS.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -331,7 +398,9 @@ class _CurrentMonthRegistrationCard extends ConsumerWidget {
               height: 24,
               child: Center(
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: _DS.textMuted),
+                  strokeWidth: 2,
+                  color: _DS.textMuted,
+                ),
               ),
             ),
             error: (_, __) => const SizedBox.shrink(),
@@ -364,41 +433,50 @@ class _FeeCard extends ConsumerWidget {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: fee.isActive == true
-                      ? _DS.attendGreen.withValues(alpha:0.15)
+                      ? _DS.attendGreen.withValues(alpha: 0.15)
                       : _DS.surface,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Text(fee.isActive == true ? '활성' : '비활성',
-                    style: TextStyle(
-                        color: fee.isActive == true
-                            ? _DS.attendGreen
-                            : _DS.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700)),
+                child: Text(
+                  fee.isActive == true ? '활성' : '비활성',
+                  style: TextStyle(
+                    color: fee.isActive == true
+                        ? _DS.attendGreen
+                        : _DS.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               const Spacer(),
-              Text('${fee.amount ?? 0}원',
-                  style: const TextStyle(
-                      color: _DS.gold,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800)),
+              Text(
+                '${fee.amount ?? 0}원',
+                style: const TextStyle(
+                  color: _DS.gold,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(fee.name ?? fee.feeType.value,
-              style: const TextStyle(
-                  color: _DS.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700)),
+          Text(
+            fee.name ?? fee.feeType.value,
+            style: const TextStyle(
+              color: _DS.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           if (fee.memo != null) ...[
             const SizedBox(height: 4),
-            Text(fee.memo!,
-                style:
-                    TextStyle(color: _DS.textSecondary, fontSize: 13)),
+            Text(
+              fee.memo!,
+              style: TextStyle(color: _DS.textSecondary, fontSize: 13),
+            ),
           ],
           const Divider(color: _DS.divider, height: 24),
           // 납부 현황
@@ -413,8 +491,11 @@ class _FeeCard extends ConsumerWidget {
             loading: () => const SizedBox(
               height: 24,
               child: Center(
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: _DS.textMuted)),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: _DS.textMuted,
+                ),
+              ),
             ),
             error: (_, __) => const SizedBox.shrink(),
           ),
@@ -442,16 +523,18 @@ void _showUnpaidListDialog(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: unpaid
-              .map((r) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      r.userName ?? '알 수 없음',
-                      style: const TextStyle(
-                        color: _DS.textSecondary,
-                        fontSize: 14,
-                      ),
+              .map(
+                (r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    r.userName ?? '알 수 없음',
+                    style: const TextStyle(
+                      color: _DS.textSecondary,
+                      fontSize: 14,
                     ),
-                  ))
+                  ),
+                ),
+              )
               .toList(),
         ),
       ),
@@ -492,11 +575,14 @@ class _PaymentStatus extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('납부 현황',
-                style: TextStyle(
-                    color: _DS.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600)),
+            Text(
+              '납부 현황',
+              style: TextStyle(
+                color: _DS.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const Spacer(),
             if (total > paid)
               Padding(
@@ -508,8 +594,9 @@ class _PaymentStatus extends StatelessWidget {
                         .toList();
                     _showUnpaidListDialog(context, unpaid);
                     try {
-                      final callable = FirebaseFunctions.instance
-                          .httpsCallable('sendNudgeToUnpaid');
+                      final callable = FirebaseFunctions.instance.httpsCallable(
+                        'sendNudgeToUnpaid',
+                      );
                       final result = await callable.call({
                         'teamId': teamId,
                         'feeId': feeId,
@@ -538,32 +625,41 @@ class _PaymentStatus extends StatelessWidget {
                       }
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('알림 발송 실패: $e')),
-                        );
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text('알림 발송 실패: $e')));
                       }
                     }
                   },
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.notifications_active_outlined,
-                          size: 14, color: _DS.gold),
+                      Icon(
+                        Icons.notifications_active_outlined,
+                        size: 14,
+                        color: _DS.gold,
+                      ),
                       const SizedBox(width: 4),
-                      Text('미납자 알림',
-                          style: TextStyle(
-                              color: _DS.gold,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600)),
+                      Text(
+                        '미납자 알림',
+                        style: TextStyle(
+                          color: _DS.gold,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-            Text('$paid / $total',
-                style: TextStyle(
-                    color: paid == total ? _DS.attendGreen : _DS.gold,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              '$paid / $total',
+              style: TextStyle(
+                color: paid == total ? _DS.attendGreen : _DS.gold,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -593,39 +689,46 @@ class _PaymentStatus extends StatelessWidget {
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 5),
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: isPaid
-                      ? _DS.attendGreen.withValues(alpha:0.1)
+                      ? _DS.attendGreen.withValues(alpha: 0.1)
                       : _DS.surface,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: isPaid
-                          ? _DS.attendGreen.withValues(alpha:0.3)
-                          : _DS.divider),
+                    color: isPaid
+                        ? _DS.attendGreen.withValues(alpha: 0.3)
+                        : _DS.divider,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                        isPaid
-                            ? Icons.check_circle
-                            : Icons.radio_button_unchecked,
-                        size: 14,
-                        color: isPaid ? _DS.attendGreen : _DS.textMuted),
+                      isPaid
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
+                      size: 14,
+                      color: isPaid ? _DS.attendGreen : _DS.textMuted,
+                    ),
                     const SizedBox(width: 4),
-                    Text(reg.userName ?? '알 수 없음',
-                        style: TextStyle(
-                            color: isPaid
-                                ? _DS.textPrimary
-                                : _DS.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500)),
+                    Text(
+                      reg.userName ?? '알 수 없음',
+                      style: TextStyle(
+                        color: isPaid ? _DS.textPrimary : _DS.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     if (reg.membershipStatus != null) ...[
                       const SizedBox(width: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 1),
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: _DS.surface,
                           borderRadius: BorderRadius.circular(4),

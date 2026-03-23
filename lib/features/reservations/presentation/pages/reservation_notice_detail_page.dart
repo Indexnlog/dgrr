@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/errors/error_handler.dart';
+import '../../../../core/widgets/error_retry_view.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../teams/domain/entities/member.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
@@ -15,7 +17,6 @@ class _DS {
   _DS._();
   static const bgDeep = Color(0xFF0D1117);
   static const bgCard = Color(0xFF161B22);
-  static const surface = Color(0xFF21262D);
   static const teamRed = Color(0xFFDC2626);
   static const gold = Color(0xFFFBBF24);
   static const textPrimary = Color(0xFFF0F6FC);
@@ -29,10 +30,7 @@ class _DS {
 
 /// 예약 공지 상세 페이지 (성공 버튼 포함)
 class ReservationNoticeDetailPage extends ConsumerStatefulWidget {
-  const ReservationNoticeDetailPage({
-    super.key,
-    required this.noticeId,
-  });
+  const ReservationNoticeDetailPage({super.key, required this.noticeId});
 
   final String noticeId;
 
@@ -84,20 +82,16 @@ class _ReservationNoticeDetailPageState
           return _buildContent(notice, currentUser?.uid, memberMap);
         },
         loading: () => const Center(
-          child: CircularProgressIndicator(color: _DS.teamRed, strokeWidth: 2.5),
-        ),
-        error: (e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, color: _DS.absentRed, size: 48),
-              const SizedBox(height: 12),
-              Text(
-                '데이터를 불러올 수 없습니다',
-                style: TextStyle(color: _DS.textSecondary, fontSize: 15),
-              ),
-            ],
+          child: CircularProgressIndicator(
+            color: _DS.teamRed,
+            strokeWidth: 2.5,
           ),
+        ),
+        error: (e, _) => ErrorRetryView(
+          message: ErrorHandler.toUserMessage(e, fallback: '데이터를 불러올 수 없습니다'),
+          detail: e.toString(),
+          onRetry: () =>
+              ref.invalidate(reservationNoticeDetailProvider(widget.noticeId)),
         ),
       ),
     );
@@ -108,13 +102,13 @@ class _ReservationNoticeDetailPageState
     String? currentUid,
     Map<String, Member> memberMap,
   ) {
-    final typeLabel =
-        notice.reservedForType == ReservationNoticeForType.class_
-            ? '수업'
-            : '매치';
+    final typeLabel = notice.reservedForType == ReservationNoticeForType.class_
+        ? '수업'
+        : '매치';
     final dateStr =
         '${notice.targetDate.month}/${notice.targetDate.day} (${_weekday(notice.targetDate.weekday)})';
-    final timeStr = notice.targetStartTime != null && notice.targetEndTime != null
+    final timeStr =
+        notice.targetStartTime != null && notice.targetEndTime != null
         ? '${notice.targetStartTime!.substring(0, 5)}~${notice.targetEndTime!.substring(0, 5)}'
         : '';
 
@@ -137,9 +131,11 @@ class _ReservationNoticeDetailPageState
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: _DS.teamRed.withValues(alpha:0.2),
+                        color: _DS.teamRed.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -185,14 +181,16 @@ class _ReservationNoticeDetailPageState
             ),
           ),
           const SizedBox(height: 12),
-          ...(notice.slots ?? []).map((slot) => _SlotCard(
-                slot: slot,
-                currentUid: currentUid,
-                memberMap: memberMap,
-                isReporting: _reportingSlots[slot.groundId] ?? false,
-                onReportSuccess: () => _reportSuccess(slot.groundId),
-                onReportFailed: () => _reportFailed(slot.groundId),
-              )),
+          ...(notice.slots ?? []).map(
+            (slot) => _buildSlotCard(
+              slot: slot,
+              currentUid: currentUid,
+              memberMap: memberMap,
+              isReporting: _reportingSlots[slot.groundId] ?? false,
+              onReportSuccess: () => _reportSuccess(slot.groundId),
+              onReportFailed: () => _reportFailed(slot.groundId),
+            ),
+          ),
           if (notice.fallback != null) ...[
             const SizedBox(height: 24),
             _buildFallbackCard(notice.fallback!),
@@ -202,7 +200,7 @@ class _ReservationNoticeDetailPageState
     );
   }
 
-  Widget _SlotCard({
+  Widget _buildSlotCard({
     required ReservationNoticeSlot slot,
     required String? currentUid,
     required Map<String, Member> memberMap,
@@ -212,12 +210,17 @@ class _ReservationNoticeDetailPageState
   }) {
     final isSuccess = slot.result == SlotResult.success;
     final isFailed = slot.result == SlotResult.failed;
-    final isManager = currentUid != null &&
-        (slot.managers?.contains(currentUid) ?? false);
+    final isManager =
+        currentUid != null && (slot.managers?.contains(currentUid) ?? false);
     final canReport = isManager && !isSuccess && !isFailed && !isReporting;
 
     final managerNames = (slot.managers ?? [])
-        .map((uid) => memberMap[uid]?.uniformName ?? memberMap[uid]?.name ?? uid.substring(0, 6))
+        .map(
+          (uid) =>
+              memberMap[uid]?.uniformName ??
+              memberMap[uid]?.name ??
+              uid.substring(0, 6),
+        )
         .join(', ');
 
     return Padding(
@@ -229,10 +232,10 @@ class _ReservationNoticeDetailPageState
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSuccess
-                ? _DS.attendGreen.withValues(alpha:0.4)
+                ? _DS.attendGreen.withValues(alpha: 0.4)
                 : isFailed
-                    ? _DS.absentRed.withValues(alpha:0.4)
-                    : _DS.divider,
+                ? _DS.absentRed.withValues(alpha: 0.4)
+                : _DS.divider,
           ),
         ),
         child: Column(
@@ -289,8 +292,8 @@ class _ReservationNoticeDetailPageState
             Text(
               '담당: $managerNames',
               style: TextStyle(color: _DS.textSecondary, fontSize: 13),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             if (slot.url != null && slot.url!.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -369,9 +372,9 @@ class _ReservationNoticeDetailPageState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _DS.gold.withValues(alpha:0.1),
+        color: _DS.gold.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _DS.gold.withValues(alpha:0.3)),
+        border: Border.all(color: _DS.gold.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,7 +433,9 @@ class _ReservationNoticeDetailPageState
   }
 
   Future<void> _reportSuccess(String groundId) async {
-    final noticeRef = ref.read(reservationNoticeDetailProvider(widget.noticeId));
+    final noticeRef = ref.read(
+      reservationNoticeDetailProvider(widget.noticeId),
+    );
     final notice = noticeRef.value;
     if (notice == null) return;
 
@@ -439,11 +444,14 @@ class _ReservationNoticeDetailPageState
 
     final memberMap = ref.read(memberMapProvider);
     final member = memberMap[currentUser.uid];
-    final userName = member?.uniformName ?? member?.name ?? currentUser.displayName ?? '회원';
+    final userName =
+        member?.uniformName ?? member?.name ?? currentUser.displayName ?? '회원';
 
     setState(() => _reportingSlots[groundId] = true);
     try {
-      await ref.read(reservationNoticeDataSourceProvider).reportSuccess(
+      await ref
+          .read(reservationNoticeDataSourceProvider)
+          .reportSuccess(
             teamId: ref.read(currentTeamIdProvider)!,
             noticeId: widget.noticeId,
             groundId: groundId,
@@ -460,12 +468,7 @@ class _ReservationNoticeDetailPageState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('오류: $e'),
-            backgroundColor: _DS.absentRed,
-          ),
-        );
+        ErrorHandler.showError(context, e, fallback: '성공 보고 처리 중 오류가 발생했습니다');
       }
     } finally {
       if (mounted) setState(() => _reportingSlots[groundId] = false);
@@ -479,25 +482,22 @@ class _ReservationNoticeDetailPageState
 
     setState(() => _reportingSlots[groundId] = true);
     try {
-      await ref.read(reservationNoticeDataSourceProvider).reportFailed(
+      await ref
+          .read(reservationNoticeDataSourceProvider)
+          .reportFailed(
             teamId: teamId,
             noticeId: widget.noticeId,
             groundId: groundId,
             userId: currentUser.uid,
           );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('실패로 기록되었습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('실패로 기록되었습니다.')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('오류: $e'),
-            backgroundColor: _DS.absentRed,
-          ),
-        );
+        ErrorHandler.showError(context, e, fallback: '실패 보고 처리 중 오류가 발생했습니다');
       }
     } finally {
       if (mounted) setState(() => _reportingSlots[groundId] = false);

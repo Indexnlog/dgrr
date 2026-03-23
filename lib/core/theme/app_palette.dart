@@ -32,13 +32,13 @@ class AppPalette {
 
   // === 오퍼시티 변형 (필요 시 사용) ===
   static Color inchWorm50([double opacity = 0.5]) =>
-      inchWorm.withOpacity(opacity);
+      inchWorm.withValues(alpha: opacity);
   static Color scienceBlue60([double opacity = 0.6]) =>
-      scienceBlue.withOpacity(opacity);
+      scienceBlue.withValues(alpha: opacity);
   static Color black70([double opacity = 0.7]) =>
-      black.withOpacity(opacity);
+      black.withValues(alpha: opacity);
   static Color springSun80([double opacity = 0.8]) =>
-      springSun.withOpacity(opacity);
+      springSun.withValues(alpha: opacity);
   static Color manz90([double opacity = 0.9]) =>
-      manz.withOpacity(opacity);
+      manz.withValues(alpha: opacity);
 }

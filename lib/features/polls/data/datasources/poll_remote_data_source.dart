@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../core/errors/errors.dart';
 import '../models/poll_model.dart';
 
 /// 투표 Firestore 데이터소스
@@ -17,9 +18,17 @@ class PollRemoteDataSource {
         .where('isActive', isEqualTo: true)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => PollModel.fromFirestore(doc.id, doc.data()))
-            .toList());
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '진행 중 투표를 불러오는 중 오류가 발생했습니다',
+          );
+        })
+        .map(
+          (snap) => snap.docs
+              .map((doc) => PollModel.fromFirestore(doc.id, doc.data()))
+              .toList(),
+        );
   }
 
   /// 모든 투표 (최근순, 페이지네이션 limit 기본 30)
@@ -28,9 +37,17 @@ class PollRemoteDataSource {
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((doc) => PollModel.fromFirestore(doc.id, doc.data()))
-            .toList());
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '투표 목록을 불러오는 중 오류가 발생했습니다',
+          );
+        })
+        .map(
+          (snap) => snap.docs
+              .map((doc) => PollModel.fromFirestore(doc.id, doc.data()))
+              .toList(),
+        );
   }
 
   /// 특정 월의 월별 등록 투표 조회 (category=membership, targetMonth)
@@ -43,6 +60,12 @@ class PollRemoteDataSource {
         .where('targetMonth', isEqualTo: targetMonth)
         .limit(1)
         .snapshots()
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '월 등록 투표를 불러오는 중 오류가 발생했습니다',
+          );
+        })
         .map((snap) {
           if (snap.docs.isEmpty) return null;
           return PollModel.fromFirestore(
@@ -54,16 +77,29 @@ class PollRemoteDataSource {
 
   /// 단일 투표 실시간 스트림
   Stream<PollModel?> watchPoll(String teamId, String pollId) {
-    return _pollsRef(teamId).doc(pollId).snapshots().map((snap) {
-      if (!snap.exists || snap.data() == null) return null;
-      return PollModel.fromFirestore(snap.id, snap.data()!);
-    });
+    return _pollsRef(teamId)
+        .doc(pollId)
+        .snapshots()
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '투표 상세를 불러오는 중 오류가 발생했습니다',
+          );
+        })
+        .map((snap) {
+          if (!snap.exists || snap.data() == null) return null;
+          return PollModel.fromFirestore(snap.id, snap.data()!);
+        });
   }
 
   /// 투표 생성
   Future<String> createPoll(String teamId, PollModel poll) async {
-    final doc = await _pollsRef(teamId).add(poll.toFirestore());
-    return doc.id;
+    try {
+      final doc = await _pollsRef(teamId).add(poll.toFirestore());
+      return doc.id;
+    } catch (error) {
+      throw mapFirebaseException(error, fallbackMessage: '투표 생성 중 오류가 발생했습니다');
+    }
   }
 
   /// 투표하기 (트랜잭션: option의 votes 배열에 uid 추가 + voteCount 증가)
@@ -74,33 +110,39 @@ class PollRemoteDataSource {
     String uid,
   ) async {
     final ref = _pollsRef(teamId).doc(pollId);
-
-    await firestore.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) throw Exception('투표가 존재하지 않습니다');
-      final data = snap.data()!;
-
-      final options = (data['options'] as List?)
-              ?.map((e) => Map<String, dynamic>.from(e as Map))
-              .toList() ??
-          [];
-
-      for (final option in options) {
-        final votes = List<String>.from(option['votes'] ?? []);
-        if (option['id'] == optionId) {
-          if (!votes.contains(uid)) {
-            votes.add(uid);
-          }
+    try {
+      await firestore.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          throw const NotFoundException(message: '투표가 존재하지 않습니다');
         }
-        option['votes'] = votes;
-        option['voteCount'] = votes.length;
-      }
+        final data = snap.data()!;
 
-      tx.update(ref, {
-        'options': options,
-        'updatedAt': FieldValue.serverTimestamp(),
+        final options =
+            (data['options'] as List?)
+                ?.map((e) => Map<String, dynamic>.from(e as Map))
+                .toList() ??
+            [];
+
+        for (final option in options) {
+          final votes = List<String>.from(option['votes'] ?? []);
+          if (option['id'] == optionId) {
+            if (!votes.contains(uid)) {
+              votes.add(uid);
+            }
+          }
+          option['votes'] = votes;
+          option['voteCount'] = votes.length;
+        }
+
+        tx.update(ref, {
+          'options': options,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       });
-    });
+    } catch (error) {
+      throw mapFirebaseException(error, fallbackMessage: '투표 처리 중 오류가 발생했습니다');
+    }
   }
 
   /// 투표 취소 (트랜잭션: option의 votes 배열에서 uid 제거)
@@ -111,39 +153,52 @@ class PollRemoteDataSource {
     String uid,
   ) async {
     final ref = _pollsRef(teamId).doc(pollId);
-
-    await firestore.runTransaction((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) throw Exception('투표가 존재하지 않습니다');
-      final data = snap.data()!;
-
-      final options = (data['options'] as List?)
-              ?.map((e) => Map<String, dynamic>.from(e as Map))
-              .toList() ??
-          [];
-
-      for (final option in options) {
-        final votes = List<String>.from(option['votes'] ?? []);
-        if (option['id'] == optionId) {
-          votes.remove(uid);
+    try {
+      await firestore.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          throw const NotFoundException(message: '투표가 존재하지 않습니다');
         }
-        option['votes'] = votes;
-        option['voteCount'] = votes.length;
-      }
+        final data = snap.data()!;
 
-      tx.update(ref, {
-        'options': options,
-        'updatedAt': FieldValue.serverTimestamp(),
+        final options =
+            (data['options'] as List?)
+                ?.map((e) => Map<String, dynamic>.from(e as Map))
+                .toList() ??
+            [];
+
+        for (final option in options) {
+          final votes = List<String>.from(option['votes'] ?? []);
+          if (option['id'] == optionId) {
+            votes.remove(uid);
+          }
+          option['votes'] = votes;
+          option['voteCount'] = votes.length;
+        }
+
+        tx.update(ref, {
+          'options': options,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       });
-    });
+    } catch (error) {
+      throw mapFirebaseException(
+        error,
+        fallbackMessage: '투표 취소 처리 중 오류가 발생했습니다',
+      );
+    }
   }
 
   /// 투표 종료
   Future<void> closePoll(String teamId, String pollId) async {
-    await _pollsRef(teamId).doc(pollId).update({
-      'isActive': false,
-      'resultFinalizedAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await _pollsRef(teamId).doc(pollId).update({
+        'isActive': false,
+        'resultFinalizedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      throw mapFirebaseException(error, fallbackMessage: '투표 종료 중 오류가 발생했습니다');
+    }
   }
 
   /// 투표에 연결된 이벤트 ID 설정 (출석 투표 → 수업 생성 후)
@@ -152,8 +207,13 @@ class PollRemoteDataSource {
     String pollId,
     String eventId,
   ) async {
-    await _pollsRef(teamId).doc(pollId).update({
-      'linkedEventId': eventId,
-    });
+    try {
+      await _pollsRef(teamId).doc(pollId).update({'linkedEventId': eventId});
+    } catch (error) {
+      throw mapFirebaseException(
+        error,
+        fallbackMessage: '연결 이벤트 설정 중 오류가 발생했습니다',
+      );
+    }
   }
 }

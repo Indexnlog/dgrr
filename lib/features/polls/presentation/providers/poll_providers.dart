@@ -12,8 +12,7 @@ final pollDataSourceProvider = Provider<PollRemoteDataSource>((ref) {
 });
 
 /// 활성 투표 목록 (autoDispose: 구독 해제로 메모리 절약)
-final activePollsProvider =
-    StreamProvider.autoDispose<List<PollModel>>((ref) {
+final activePollsProvider = StreamProvider.autoDispose<List<PollModel>>((ref) {
   final teamId = ref.watch(currentTeamIdProvider);
   if (teamId == null) return const Stream.empty();
   return ref.watch(pollDataSourceProvider).watchActivePolls(teamId);
@@ -26,17 +25,28 @@ final allPollsProvider = StreamProvider.autoDispose<List<PollModel>>((ref) {
   return ref.watch(pollDataSourceProvider).watchAllPolls(teamId);
 });
 
+/// 전체 투표 목록 (페이지 limit 가변)
+final allPollsWithLimitProvider = StreamProvider.autoDispose
+    .family<List<PollModel>, int>((ref, limit) {
+      final teamId = ref.watch(currentTeamIdProvider);
+      if (teamId == null) return const Stream.empty();
+      return ref
+          .watch(pollDataSourceProvider)
+          .watchAllPolls(teamId, limit: limit);
+    });
+
 /// 단일 투표 상세
-final pollDetailProvider =
-    StreamProvider.family<PollModel?, String>((ref, pollId) {
+final pollDetailProvider = StreamProvider.family<PollModel?, String>((
+  ref,
+  pollId,
+) {
   final teamId = ref.watch(currentTeamIdProvider);
   if (teamId == null) return Stream.value(null);
   return ref.watch(pollDataSourceProvider).watchPoll(teamId, pollId);
 });
 
 /// 다음 달 월별 등록 투표 (있으면 반환)
-final nextMonthMembershipPollProvider =
-    StreamProvider<PollModel?>((ref) {
+final nextMonthMembershipPollProvider = StreamProvider<PollModel?>((ref) {
   final teamId = ref.watch(currentTeamIdProvider);
   if (teamId == null) return Stream.value(null);
   final targetMonth = PollCreationService.nextMonth();

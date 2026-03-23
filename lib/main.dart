@@ -17,8 +17,7 @@ import 'firebase_options.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   if (kDebugMode) {
-    // ignore: avoid_print
-    print('[FCM] 백그라운드 메시지: ${message.messageId}');
+    debugPrint('[FCM] 백그라운드 메시지: ${message.messageId}');
   }
 }
 

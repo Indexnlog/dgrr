@@ -28,15 +28,29 @@ bool _shouldShowMatchCard(MatchModel m) {
 
 /// 다가오는 경기 목록 실시간 스트림 (성사된 경기만 표시)
 /// autoDispose: 매치 탭 벗어나면 구독 해제
-final upcomingMatchesProvider =
-    StreamProvider.autoDispose<List<MatchModel>>((ref) {
+final upcomingMatchesProvider = StreamProvider.autoDispose<List<MatchModel>>((
+  ref,
+) {
   final teamId = ref.watch(currentTeamIdProvider);
   if (teamId == null) return const Stream.empty();
 
   final ds = ref.watch(matchDataSourceProvider);
-  return ds.watchUpcomingMatches(teamId).map((list) =>
-      list.where(_shouldShowMatchCard).toList());
+  return ds
+      .watchUpcomingMatches(teamId)
+      .map((list) => list.where(_shouldShowMatchCard).toList());
 });
+
+/// 다가오는 경기 목록 (페이지 limit 가변)
+final upcomingMatchesWithLimitProvider = StreamProvider.autoDispose
+    .family<List<MatchModel>, int>((ref, limit) {
+      final teamId = ref.watch(currentTeamIdProvider);
+      if (teamId == null) return const Stream.empty();
+
+      final ds = ref.watch(matchDataSourceProvider);
+      return ds
+          .watchUpcomingMatches(teamId, limit: limit)
+          .map((list) => list.where(_shouldShowMatchCard).toList());
+    });
 
 /// 오늘 경기 또는 진행 중 경기 개수 (매치 탭 배지용)
 final todayOrLiveMatchCountProvider = Provider<int>((ref) {
@@ -52,13 +66,8 @@ final todayOrLiveMatchCountProvider = Provider<int>((ref) {
   }).length;
 });
 
-
 /// 참석 투표 (트랜잭션 + 성사 시 Telegram 알림)
-Future<void> voteAttend(
-  WidgetRef ref,
-  Match match,
-  String uid,
-) async {
+Future<void> voteAttend(WidgetRef ref, Match match, String uid) async {
   final teamId = ref.read(currentTeamIdProvider);
   if (teamId == null) return;
 
@@ -106,11 +115,7 @@ Future<void> voteAttendLate(
 }
 
 /// 불참 투표 (트랜잭션 + 취소 위기 시 Telegram 알림)
-Future<void> voteAbsent(
-  WidgetRef ref,
-  Match match,
-  String uid,
-) async {
+Future<void> voteAbsent(WidgetRef ref, Match match, String uid) async {
   final teamId = ref.read(currentTeamIdProvider);
   if (teamId == null) return;
 
@@ -156,11 +161,7 @@ Future<void> voteAbsentWithReason(
 }
 
 /// 공 가져가기 자원 토글 ("저도 들고가요")
-Future<void> toggleBallBringer(
-  WidgetRef ref,
-  Match match,
-  String uid,
-) async {
+Future<void> toggleBallBringer(WidgetRef ref, Match match, String uid) async {
   final teamId = ref.read(currentTeamIdProvider);
   if (teamId == null) return;
   await ref

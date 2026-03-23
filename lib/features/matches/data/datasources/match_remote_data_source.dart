@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../../core/errors/errors.dart';
 import '../../domain/entities/match.dart';
 import '../models/match_model.dart';
 
@@ -22,8 +23,7 @@ class VoteResult {
       previousStatus == 'pending' && newStatus == 'fixed';
 
   /// fixed -> pending 롤백이 발생했는지
-  bool get didLoseQuorum =>
-      previousStatus == 'fixed' && newStatus == 'pending';
+  bool get didLoseQuorum => previousStatus == 'fixed' && newStatus == 'pending';
 }
 
 /// 경기 Firestore 데이터소스
@@ -45,9 +45,17 @@ class MatchRemoteDataSource {
         .orderBy('date', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => MatchModel.fromFirestore(doc.id, doc.data()))
-            .toList());
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '최근 경기 목록을 불러오는 중 오류가 발생했습니다',
+          );
+        })
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => MatchModel.fromFirestore(doc.id, doc.data()))
+              .toList(),
+        );
   }
 
   /// 기간별 경기 목록 실시간 스트림 (캘린더 월 표시용)
@@ -61,9 +69,17 @@ class MatchRemoteDataSource {
         .where('date', isLessThanOrEqualTo: Timestamp.fromDate(end))
         .orderBy('date')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => MatchModel.fromFirestore(doc.id, doc.data()))
-            .toList());
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '경기 일정을 불러오는 중 오류가 발생했습니다',
+          );
+        })
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => MatchModel.fromFirestore(doc.id, doc.data()))
+              .toList(),
+        );
   }
 
   /// 다음(미래) 경기 목록 실시간 스트림 — date 오름차순, 오늘 이후만
@@ -80,9 +96,17 @@ class MatchRemoteDataSource {
         .orderBy('date')
         .limit(limit)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => MatchModel.fromFirestore(doc.id, doc.data()))
-            .toList());
+        .handleError((error) {
+          throw mapFirebaseException(
+            error,
+            fallbackMessage: '다가오는 경기 목록을 불러오는 중 오류가 발생했습니다',
+          );
+        })
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => MatchModel.fromFirestore(doc.id, doc.data()))
+              .toList(),
+        );
   }
 
   /// 참석 투표 (트랜잭션: attendees 추가 + 자동 성사 전환)
@@ -92,51 +116,57 @@ class MatchRemoteDataSource {
     String uid,
   ) async {
     final ref = _matchesRef(teamId).doc(matchId);
+    try {
+      return await firestore.runTransaction<VoteResult>((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          throw const NotFoundException(message: '경기 문서가 존재하지 않습니다');
+        }
+        final data = snap.data()!;
 
-    return firestore.runTransaction<VoteResult>((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) {
-        throw Exception('경기 문서가 존재하지 않습니다');
-      }
-      final data = snap.data()!;
+        final attendees = Set<String>.from(data['attendees'] ?? []);
+        final absentees = Set<String>.from(data['absentees'] ?? []);
+        var lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
+        var lateReasons = Map<String, String>.from(
+          (data['lateReasons'] as Map?)?.map(
+                (k, v) => MapEntry(k.toString(), v.toString()),
+              ) ??
+              {},
+        );
 
-      final attendees = Set<String>.from(data['attendees'] ?? []);
-      final absentees = Set<String>.from(data['absentees'] ?? []);
-      var lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
-      var lateReasons = Map<String, String>.from(
-        (data['lateReasons'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
-      );
+        attendees.add(uid);
+        absentees.remove(uid);
+        lateAttendees.remove(uid);
+        lateReasons.remove(uid);
 
-      attendees.add(uid);
-      absentees.remove(uid);
-      lateAttendees.remove(uid);
-      lateReasons.remove(uid);
+        final minPlayers = data['minPlayers'] as int? ?? 7;
+        final previousStatus = data['status'] as String?;
+        var newStatus = previousStatus;
 
-      final minPlayers = data['minPlayers'] as int? ?? 7;
-      final previousStatus = data['status'] as String?;
-      var newStatus = previousStatus;
+        // 자동 성사: pending 상태에서 인원 충족 시 fixed로 전환
+        if (attendees.length >= minPlayers && previousStatus == 'pending') {
+          newStatus = 'fixed';
+        }
 
-      // 자동 성사: pending 상태에서 인원 충족 시 fixed로 전환
-      if (attendees.length >= minPlayers && previousStatus == 'pending') {
-        newStatus = 'fixed';
-      }
+        tx.update(ref, {
+          'attendees': attendees.toList(),
+          'absentees': absentees.toList(),
+          'lateAttendees': lateAttendees,
+          'lateReasons': lateReasons,
+          'status': newStatus,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
-      tx.update(ref, {
-        'attendees': attendees.toList(),
-        'absentees': absentees.toList(),
-        'lateAttendees': lateAttendees,
-        'lateReasons': lateReasons,
-        'status': newStatus,
-        'updatedAt': FieldValue.serverTimestamp(),
+        return VoteResult(
+          previousStatus: previousStatus,
+          newStatus: newStatus,
+          attendeeCount: attendees.length,
+          minPlayers: minPlayers,
+        );
       });
-
-      return VoteResult(
-        previousStatus: previousStatus,
-        newStatus: newStatus,
-        attendeeCount: attendees.length,
-        minPlayers: minPlayers,
-      );
-    });
+    } catch (error) {
+      throw mapFirebaseException(error, fallbackMessage: '참석 처리 중 오류가 발생했습니다');
+    }
   }
 
   /// 지각 참석 투표 (참석 + 지각 예상 시간)
@@ -147,47 +177,58 @@ class MatchRemoteDataSource {
     String lateTime,
   ) async {
     final ref = _matchesRef(teamId).doc(matchId);
+    try {
+      return await firestore.runTransaction<VoteResult>((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          throw const NotFoundException(message: '경기 문서가 존재하지 않습니다');
+        }
+        final data = snap.data()!;
 
-    return firestore.runTransaction<VoteResult>((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) throw Exception('경기 문서가 존재하지 않습니다');
-      final data = snap.data()!;
+        final attendees = Set<String>.from(data['attendees'] ?? []);
+        final absentees = Set<String>.from(data['absentees'] ?? []);
+        final lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
+        final lateReasons = Map<String, String>.from(
+          (data['lateReasons'] as Map?)?.map(
+                (k, v) => MapEntry(k.toString(), v.toString()),
+              ) ??
+              {},
+        );
 
-      final attendees = Set<String>.from(data['attendees'] ?? []);
-      final absentees = Set<String>.from(data['absentees'] ?? []);
-      final lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
-      final lateReasons = Map<String, String>.from(
-        (data['lateReasons'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
-      );
+        attendees.add(uid);
+        absentees.remove(uid);
+        if (!lateAttendees.contains(uid)) lateAttendees.add(uid);
+        lateReasons[uid] = lateTime;
 
-      attendees.add(uid);
-      absentees.remove(uid);
-      if (!lateAttendees.contains(uid)) lateAttendees.add(uid);
-      lateReasons[uid] = lateTime;
+        final minPlayers = data['minPlayers'] as int? ?? 7;
+        final previousStatus = data['status'] as String?;
+        var newStatus = previousStatus;
+        if (attendees.length >= minPlayers && previousStatus == 'pending') {
+          newStatus = 'fixed';
+        }
 
-      final minPlayers = data['minPlayers'] as int? ?? 7;
-      final previousStatus = data['status'] as String?;
-      var newStatus = previousStatus;
-      if (attendees.length >= minPlayers && previousStatus == 'pending') {
-        newStatus = 'fixed';
-      }
+        tx.update(ref, {
+          'attendees': attendees.toList(),
+          'absentees': absentees.toList(),
+          'lateAttendees': lateAttendees,
+          'lateReasons': lateReasons,
+          'status': newStatus,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
-      tx.update(ref, {
-        'attendees': attendees.toList(),
-        'absentees': absentees.toList(),
-        'lateAttendees': lateAttendees,
-        'lateReasons': lateReasons,
-        'status': newStatus,
-        'updatedAt': FieldValue.serverTimestamp(),
+        return VoteResult(
+          previousStatus: previousStatus,
+          newStatus: newStatus,
+          attendeeCount: attendees.length,
+          minPlayers: minPlayers,
+        );
       });
-
-      return VoteResult(
-        previousStatus: previousStatus,
-        newStatus: newStatus,
-        attendeeCount: attendees.length,
-        minPlayers: minPlayers,
+    } catch (error) {
+      throw mapFirebaseException(
+        error,
+        fallbackMessage: '지각 참석 처리 중 오류가 발생했습니다',
       );
-    });
+    }
   }
 
   /// 불참 투표 (트랜잭션: absentees 추가 + 성사 롤백)
@@ -197,51 +238,57 @@ class MatchRemoteDataSource {
     String uid,
   ) async {
     final ref = _matchesRef(teamId).doc(matchId);
+    try {
+      return await firestore.runTransaction<VoteResult>((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          throw const NotFoundException(message: '경기 문서가 존재하지 않습니다');
+        }
+        final data = snap.data()!;
 
-    return firestore.runTransaction<VoteResult>((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) {
-        throw Exception('경기 문서가 존재하지 않습니다');
-      }
-      final data = snap.data()!;
+        final attendees = Set<String>.from(data['attendees'] ?? []);
+        final absentees = Set<String>.from(data['absentees'] ?? []);
+        var lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
+        var lateReasons = Map<String, String>.from(
+          (data['lateReasons'] as Map?)?.map(
+                (k, v) => MapEntry(k.toString(), v.toString()),
+              ) ??
+              {},
+        );
 
-      final attendees = Set<String>.from(data['attendees'] ?? []);
-      final absentees = Set<String>.from(data['absentees'] ?? []);
-      var lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
-      var lateReasons = Map<String, String>.from(
-        (data['lateReasons'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
-      );
+        attendees.remove(uid);
+        absentees.add(uid);
+        lateAttendees.remove(uid);
+        lateReasons.remove(uid);
 
-      attendees.remove(uid);
-      absentees.add(uid);
-      lateAttendees.remove(uid);
-      lateReasons.remove(uid);
+        final minPlayers = data['minPlayers'] as int? ?? 7;
+        final previousStatus = data['status'] as String?;
+        var newStatus = previousStatus;
 
-      final minPlayers = data['minPlayers'] as int? ?? 7;
-      final previousStatus = data['status'] as String?;
-      var newStatus = previousStatus;
+        // 인원 미달 시 fixed -> pending 롤백
+        if (attendees.length < minPlayers && previousStatus == 'fixed') {
+          newStatus = 'pending';
+        }
 
-      // 인원 미달 시 fixed -> pending 롤백
-      if (attendees.length < minPlayers && previousStatus == 'fixed') {
-        newStatus = 'pending';
-      }
+        tx.update(ref, {
+          'attendees': attendees.toList(),
+          'absentees': absentees.toList(),
+          'lateAttendees': lateAttendees,
+          'lateReasons': lateReasons,
+          'status': newStatus,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
-      tx.update(ref, {
-        'attendees': attendees.toList(),
-        'absentees': absentees.toList(),
-        'lateAttendees': lateAttendees,
-        'lateReasons': lateReasons,
-        'status': newStatus,
-        'updatedAt': FieldValue.serverTimestamp(),
+        return VoteResult(
+          previousStatus: previousStatus,
+          newStatus: newStatus,
+          attendeeCount: attendees.length,
+          minPlayers: minPlayers,
+        );
       });
-
-      return VoteResult(
-        previousStatus: previousStatus,
-        newStatus: newStatus,
-        attendeeCount: attendees.length,
-        minPlayers: minPlayers,
-      );
-    });
+    } catch (error) {
+      throw mapFirebaseException(error, fallbackMessage: '불참 처리 중 오류가 발생했습니다');
+    }
   }
 
   /// 불참 투표 + 사유 저장 (당일 변경 시)
@@ -252,59 +299,69 @@ class MatchRemoteDataSource {
     String reason,
   ) async {
     final ref = _matchesRef(teamId).doc(matchId);
+    try {
+      return await firestore.runTransaction<VoteResult>((tx) async {
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          throw const NotFoundException(message: '경기 문서가 존재하지 않습니다');
+        }
+        final data = snap.data()!;
 
-    return firestore.runTransaction<VoteResult>((tx) async {
-      final snap = await tx.get(ref);
-      if (!snap.exists) {
-        throw Exception('경기 문서가 존재하지 않습니다');
-      }
-      final data = snap.data()!;
+        final attendees = Set<String>.from(data['attendees'] ?? []);
+        final absentees = Set<String>.from(data['absentees'] ?? []);
+        var lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
+        var lateReasons = Map<String, String>.from(
+          (data['lateReasons'] as Map?)?.map(
+                (k, v) => MapEntry(k.toString(), v.toString()),
+              ) ??
+              {},
+        );
 
-      final attendees = Set<String>.from(data['attendees'] ?? []);
-      final absentees = Set<String>.from(data['absentees'] ?? []);
-      var lateAttendees = List<String>.from(data['lateAttendees'] ?? []);
-      var lateReasons = Map<String, String>.from(
-        (data['lateReasons'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
-      );
+        attendees.remove(uid);
+        absentees.add(uid);
+        lateAttendees.remove(uid);
+        lateReasons.remove(uid);
 
-      attendees.remove(uid);
-      absentees.add(uid);
-      lateAttendees.remove(uid);
-      lateReasons.remove(uid);
+        final minPlayers = data['minPlayers'] as int? ?? 7;
+        final previousStatus = data['status'] as String?;
+        var newStatus = previousStatus;
 
-      final minPlayers = data['minPlayers'] as int? ?? 7;
-      final previousStatus = data['status'] as String?;
-      var newStatus = previousStatus;
+        if (attendees.length < minPlayers && previousStatus == 'fixed') {
+          newStatus = 'pending';
+        }
 
-      if (attendees.length < minPlayers && previousStatus == 'fixed') {
-        newStatus = 'pending';
-      }
+        // 불참 사유를 absenceReasons 맵에 저장
+        final absenceReasons = Map<String, dynamic>.from(
+          data['absenceReasons'] ?? {},
+        );
+        absenceReasons[uid] = {
+          'reason': reason,
+          'timestamp': FieldValue.serverTimestamp(),
+        };
 
-      // 불참 사유를 absenceReasons 맵에 저장
-      final absenceReasons =
-          Map<String, dynamic>.from(data['absenceReasons'] ?? {});
-      absenceReasons[uid] = {
-        'reason': reason,
-        'timestamp': FieldValue.serverTimestamp(),
-      };
+        tx.update(ref, {
+          'attendees': attendees.toList(),
+          'absentees': absentees.toList(),
+          'lateAttendees': lateAttendees,
+          'lateReasons': lateReasons,
+          'absenceReasons': absenceReasons,
+          'status': newStatus,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
-      tx.update(ref, {
-        'attendees': attendees.toList(),
-        'absentees': absentees.toList(),
-        'lateAttendees': lateAttendees,
-        'lateReasons': lateReasons,
-        'absenceReasons': absenceReasons,
-        'status': newStatus,
-        'updatedAt': FieldValue.serverTimestamp(),
+        return VoteResult(
+          previousStatus: previousStatus,
+          newStatus: newStatus,
+          attendeeCount: attendees.length,
+          minPlayers: minPlayers,
+        );
       });
-
-      return VoteResult(
-        previousStatus: previousStatus,
-        newStatus: newStatus,
-        attendeeCount: attendees.length,
-        minPlayers: minPlayers,
+    } catch (error) {
+      throw mapFirebaseException(
+        error,
+        fallbackMessage: '불참 사유 저장 중 오류가 발생했습니다',
       );
-    });
+    }
   }
 
   /// 공 가져가기 자원 토글 ("저도 들고가요" 방식)
@@ -365,7 +422,8 @@ class MatchRemoteDataSource {
       'lineup': lineup,
       if (lineupSize != null) 'lineupSize': lineupSize,
       if (captainId != null) 'captainId': captainId,
-      if (lineupAnnouncedAt != null) 'lineupAnnouncedAt': Timestamp.fromDate(lineupAnnouncedAt),
+      if (lineupAnnouncedAt != null)
+        'lineupAnnouncedAt': Timestamp.fromDate(lineupAnnouncedAt),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -461,10 +519,7 @@ class MatchRemoteDataSource {
       gameStatus: GameStatus.notStarted,
       minPlayers: 7,
       isTimeConfirmed: false,
-      opponent: const OpponentInfoModel(
-        name: '스마일리',
-        status: 'seeking',
-      ),
+      opponent: const OpponentInfoModel(name: '스마일리', status: 'seeking'),
       attendees: const [],
       absentees: const [],
       createdAt: DateTime.now(),
