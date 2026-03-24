@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/card_skeleton.dart';
@@ -30,6 +31,7 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage>
     with SingleTickerProviderStateMixin {
+  static const double _cardRadius = 14;
   bool _seeded = false;
   late AnimationController _pulseController;
   final _matchSearchController = TextEditingController();
@@ -332,7 +334,7 @@ class _HomePageState extends ConsumerState<HomePage>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppTheme.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(_cardRadius),
         border: Border.all(color: AppTheme.divider),
       ),
       child: Row(
@@ -394,7 +396,7 @@ class _HomePageState extends ConsumerState<HomePage>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: AppTheme.fixedBlue.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(_cardRadius),
             border: Border.all(
               color: AppTheme.fixedBlue.withValues(alpha: 0.3),
             ),
@@ -445,7 +447,7 @@ class _HomePageState extends ConsumerState<HomePage>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: AppTheme.attendGreen.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(_cardRadius),
             border: Border.all(
               color: AppTheme.attendGreen.withValues(alpha: 0.4),
             ),
@@ -535,7 +537,7 @@ class _HomePageState extends ConsumerState<HomePage>
           filled: true,
           fillColor: AppTheme.surface,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(_cardRadius),
             borderSide: BorderSide.none,
           ),
           contentPadding: const EdgeInsets.symmetric(
@@ -1164,40 +1166,99 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     final timeStr = (match.isTimeConfirmed ?? false)
         ? (match.startTime ?? '--:--')
         : '시간 미정';
+    final venueLabel = match.venueName ?? match.location ?? '미정';
+    final weatherLabel =
+        match.weatherSummary != null || match.tempC != null || match.rainProb != null
+        ? '${match.weatherSummary ?? '날씨'}'
+              '${match.tempC != null ? ' · ${match.tempC!.toStringAsFixed(0)}°C' : ''}'
+              '${match.rainProb != null ? ' · 강수 ${match.rainProb}%' : ''}'
+        : null;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.divider, width: 0.5),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: _InfoCell(
-              icon: Icons.calendar_today_outlined,
-              label: '날짜',
-              value: dateStr,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: _InfoCell(
+                  icon: Icons.calendar_today_outlined,
+                  label: '날짜',
+                  value: dateStr,
+                ),
+              ),
+              Container(width: 1, height: 36, color: AppTheme.divider),
+              Expanded(
+                child: _InfoCell(
+                  icon: Icons.schedule_outlined,
+                  label: '시간',
+                  value: timeStr,
+                  isMuted: !(match.isTimeConfirmed ?? false),
+                ),
+              ),
+              Container(width: 1, height: 36, color: AppTheme.divider),
+              Expanded(
+                child: _InfoCell(
+                  icon: Icons.location_on_outlined,
+                  label: '장소',
+                  value: venueLabel,
+                ),
+              ),
+            ],
           ),
-          Container(width: 1, height: 36, color: AppTheme.divider),
-          Expanded(
-            child: _InfoCell(
-              icon: Icons.schedule_outlined,
-              label: '시간',
-              value: timeStr,
-              isMuted: !(match.isTimeConfirmed ?? false),
+          if (match.address != null || weatherLabel != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (match.address != null) ...[
+                  Icon(Icons.place_outlined, size: 14, color: AppTheme.textMuted),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      match.address!,
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+                if (weatherLabel != null) ...[
+                  if (match.address != null) const SizedBox(width: 8),
+                  Text(
+                    weatherLabel,
+                    style: const TextStyle(
+                      color: AppTheme.fixedBlue,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                if (match.address != null || (match.lat != null && match.lng != null)) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _openMap(
+                      address: match.address,
+                      lat: match.lat,
+                      lng: match.lng,
+                    ),
+                    child: const Icon(
+                      Icons.map_outlined,
+                      size: 16,
+                      color: AppTheme.fixedBlue,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ),
-          Container(width: 1, height: 36, color: AppTheme.divider),
-          Expanded(
-            child: _InfoCell(
-              icon: Icons.location_on_outlined,
-              label: '장소',
-              value: match.location ?? '미정',
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -1778,6 +1839,21 @@ class _MatchCardState extends ConsumerState<_MatchCard> {
     const days = ['월', '화', '수', '목', '금', '토', '일'];
     return days[wd - 1];
   }
+
+  Future<void> _openMap({
+    String? address,
+    double? lat,
+    double? lng,
+  }) async {
+    final uri = lat != null && lng != null
+        ? Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng')
+        : Uri.parse(
+            'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address ?? '')}',
+          );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
 }
 
 // ── 서브 위젯 ──
@@ -1920,10 +1996,10 @@ class _StatChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: AppTheme.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppTheme.divider),
         ),
         child: Column(

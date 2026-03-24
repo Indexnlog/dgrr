@@ -17,6 +17,11 @@ service cloud.firestore {
       return isActiveMember(teamId) && role in ['admin', '운영진', '총무', 'treasurer', 'coach'];
     }
 
+    function canManageFinance(teamId) {
+      let role = get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role;
+      return isActiveMember(teamId) && role in ['admin', '운영진', '총무', 'treasurer'];
+    }
+
     // 팀 검색용 공개 정보 (온보딩) - 누구나 읽기, 어드민만 쓰기
     match /teams_public/{teamId} {
       allow read: if true;
@@ -46,14 +51,42 @@ service cloud.firestore {
         // 본인: 프로필 수정, rejected→pending 재신청, active→left 탈퇴 / 운영진: 승인·거절
         allow update: if request.auth != null
           && (
-            (memberId == request.auth.uid && (
-              request.resource.data.status == resource.data.status
-              || (resource.data.status == 'rejected' && request.resource.data.status == 'pending')
-              || (resource.data.status == 'active' && request.resource.data.status == 'left')
-            ))
+            (memberId == request.auth.uid
+              // 본인 업데이트는 최소 필드만 허용 (권한 상승 방지)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'name',
+                'uniformName',
+                'number',
+                'photoUrl',
+                'updatedAt',
+                'status',
+              ])
+              && request.resource.data.memberId == resource.data.memberId
+              && request.resource.data.role == resource.data.role
+              && (
+                request.resource.data.status == resource.data.status
+                || (resource.data.status == 'rejected' && request.resource.data.status == 'pending')
+                || (resource.data.status == 'active' && request.resource.data.status == 'left')
+              ))
             || canApproveMembers(teamId)
           );
         allow delete: if false;
+      }
+
+      // FCM 토큰 전용 저장소: 본인/서버만 접근 (다른 멤버는 읽기 불가)
+      match /member_tokens/{memberId} {
+        allow read, write: if request.auth != null
+          && request.auth.uid == memberId
+          && isActiveMember(teamId);
+      }
+
+      // 서버가 누적하는 요청 제어/멱등성 컬렉션
+      match /rate_limits/{docId} {
+        allow read, write: if false;
+      }
+
+      match /idempotency/{docId} {
+        allow read, write: if false;
       }
 
       match /opponents/{opponentId} {
@@ -99,7 +132,28 @@ service cloud.firestore {
       }
 
       match /registrations/{regId} {
-        allow read, write: if isActiveMember(teamId);
+        allow read: if isActiveMember(teamId);
+        // 일반 회원: 본인 등록 상태만 업데이트(결제 paid 상태는 불가)
+        // 운영진/총무: 결제 상태 포함 관리 가능
+        allow create: if isActiveMember(teamId)
+          && (
+            canManageFinance(teamId)
+            || (
+              request.resource.data.userId == request.auth.uid
+              && request.resource.data.status != 'paid'
+            )
+          );
+        allow update: if isActiveMember(teamId)
+          && (
+            canManageFinance(teamId)
+            || (
+              resource.data.userId == request.auth.uid
+              && request.resource.data.userId == resource.data.userId
+              && request.resource.data.status != 'paid'
+              && resource.data.status != 'paid'
+            )
+          );
+        allow delete: if canManageFinance(teamId);
       }
 
       match /reservations/{resId} {
@@ -107,11 +161,25 @@ service cloud.firestore {
       }
 
       match /reservation_notices/{noticeId} {
-        allow read, write: if isActiveMember(teamId);
+        allow read: if isActiveMember(teamId);
+        allow create: if isActiveMember(teamId);
+        // 예약 성공/실패 보고(slots, status)는 Cloud Functions(Admin SDK) 경유만 허용
+        allow update: if isActiveMember(teamId)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'slots',
+            'status',
+            'publishedAt',
+          ]);
+        allow delete: if canApproveMembers(teamId);
       }
 
       match /notifications/{notifId} {
-        allow read, write: if isActiveMember(teamId);
+        allow read: if isActiveMember(teamId);
+        // 알림 발송/생성은 서버 전용
+        allow create, delete: if false;
+        // 클라이언트는 읽음 처리(readBy)만 허용
+        allow update: if isActiveMember(teamId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']);
       }
 
       match /settings/{settingId} {
@@ -120,6 +188,18 @@ service cloud.firestore {
 
       match /transactions/{txId} {
         allow read, write: if isActiveMember(teamId);
+      }
+
+      // 감사 로그: 서버 append-only, 운영진/총무 조회 전용
+      match /audit_logs/{logId} {
+        allow read: if canApproveMembers(teamId);
+        allow create, update, delete: if false;
+      }
+
+      // 일별 운영 메트릭: 서버 집계, 운영진/총무 조회 전용
+      match /ops_metrics_daily/{metricId} {
+        allow read: if canApproveMembers(teamId);
+        allow create, update, delete: if false;
       }
     }
   }

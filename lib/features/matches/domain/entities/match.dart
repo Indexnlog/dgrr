@@ -40,6 +40,14 @@ class Match {
     this.startTime,
     this.endTime,
     this.location,
+    this.venueName,
+    this.address,
+    this.lat,
+    this.lng,
+    this.weatherSummary,
+    this.tempC,
+    this.rainProb,
+    this.weatherUpdatedAt,
     this.status,
     this.gameStatus,
     this.minPlayers,
@@ -73,6 +81,14 @@ class Match {
   final String? startTime;
   final String? endTime;
   final String? location;
+  final String? venueName;
+  final String? address;
+  final double? lat;
+  final double? lng;
+  final String? weatherSummary;
+  final double? tempC;
+  final int? rainProb;
+  final DateTime? weatherUpdatedAt;
   final MatchStatus? status;
   final GameStatus? gameStatus;
   /// 경기 성사 최소 인원 (기본값 7)
@@ -132,6 +148,14 @@ class Match {
     String? startTime,
     String? endTime,
     String? location,
+    String? venueName,
+    String? address,
+    double? lat,
+    double? lng,
+    String? weatherSummary,
+    double? tempC,
+    int? rainProb,
+    DateTime? weatherUpdatedAt,
     MatchStatus? status,
     GameStatus? gameStatus,
     int? minPlayers,
@@ -163,6 +187,14 @@ class Match {
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       location: location ?? this.location,
+      venueName: venueName ?? this.venueName,
+      address: address ?? this.address,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      weatherSummary: weatherSummary ?? this.weatherSummary,
+      tempC: tempC ?? this.tempC,
+      rainProb: rainProb ?? this.rainProb,
+      weatherUpdatedAt: weatherUpdatedAt ?? this.weatherUpdatedAt,
       status: status ?? this.status,
       gameStatus: gameStatus ?? this.gameStatus,
       minPlayers: minPlayers ?? this.minPlayers,

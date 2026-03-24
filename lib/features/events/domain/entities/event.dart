@@ -9,6 +9,14 @@ class Event {
     this.startTime,
     this.endTime,
     this.location,
+    this.venueName,
+    this.address,
+    this.lat,
+    this.lng,
+    this.weatherSummary,
+    this.tempC,
+    this.rainProb,
+    this.weatherUpdatedAt,
     this.status,
     this.registerStart,
     this.registerEnd,
@@ -33,6 +41,14 @@ class Event {
   final String? startTime;
   final String? endTime;
   final String? location;
+  final String? venueName;
+  final String? address;
+  final double? lat;
+  final double? lng;
+  final String? weatherSummary;
+  final double? tempC;
+  final int? rainProb;
+  final DateTime? weatherUpdatedAt;
   final EventStatus? status;
   final DateTime? registerStart;
   final DateTime? registerEnd;
@@ -59,6 +75,14 @@ class Event {
     String? startTime,
     String? endTime,
     String? location,
+    String? venueName,
+    String? address,
+    double? lat,
+    double? lng,
+    String? weatherSummary,
+    double? tempC,
+    int? rainProb,
+    DateTime? weatherUpdatedAt,
     EventStatus? status,
     DateTime? registerStart,
     DateTime? registerEnd,
@@ -81,6 +105,14 @@ class Event {
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       location: location ?? this.location,
+      venueName: venueName ?? this.venueName,
+      address: address ?? this.address,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      weatherSummary: weatherSummary ?? this.weatherSummary,
+      tempC: tempC ?? this.tempC,
+      rainProb: rainProb ?? this.rainProb,
+      weatherUpdatedAt: weatherUpdatedAt ?? this.weatherUpdatedAt,
       status: status ?? this.status,
       registerStart: registerStart ?? this.registerStart,
       registerEnd: registerEnd ?? this.registerEnd,

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/reservation_notice_model.dart';
 
@@ -7,15 +8,11 @@ class ReservationNoticeRemoteDataSource {
   ReservationNoticeRemoteDataSource({required this.firestore});
 
   final FirebaseFirestore firestore;
+  String _requestId(String action) =>
+      '${DateTime.now().microsecondsSinceEpoch}_$action';
 
   CollectionReference<Map<String, dynamic>> _noticesRef(String teamId) =>
       firestore.collection('teams').doc(teamId).collection('reservation_notices');
-
-  CollectionReference<Map<String, dynamic>> _notificationsRef(String teamId) =>
-      firestore.collection('teams').doc(teamId).collection('notifications');
-
-  CollectionReference<Map<String, dynamic>> _membersRef(String teamId) =>
-      firestore.collection('teams').doc(teamId).collection('members');
 
   /// 예약 공지 목록 (다가오는 것부터)
   Stream<List<ReservationNoticeModel>> watchUpcomingNotices(String teamId) {
@@ -70,74 +67,17 @@ class ReservationNoticeRemoteDataSource {
     required String userId,
     required String userName,
   }) async {
-    final noticeRef = _noticesRef(teamId).doc(noticeId);
-
-    await firestore.runTransaction((tx) async {
-      final noticeSnap = await tx.get(noticeRef);
-      if (!noticeSnap.exists) throw Exception('예약 공지가 존재하지 않습니다');
-
-      final data = noticeSnap.data()!;
-      final slots = (data['slots'] as List?)
-              ?.map((e) => Map<String, dynamic>.from(e as Map))
-              .toList() ??
-          [];
-
-      final slotIndex = slots.indexWhere((s) => s['groundId'] == groundId);
-      if (slotIndex < 0) throw Exception('해당 구장을 찾을 수 없습니다');
-
-      final slot = slots[slotIndex];
-      if (slot['result'] == 'success') {
-        throw Exception('이미 예약 성공 처리되었습니다');
-      }
-
-      if (slot['managers'] == null ||
-          !(slot['managers'] as List).contains(userId)) {
-        throw Exception('해당 구장 담당자가 아닙니다');
-      }
-
-      slot['result'] = 'success';
-      slot['successBy'] = userId;
-      slot['successAt'] = FieldValue.serverTimestamp();
-
-      final allReported = slots.every((s) =>
-          s['result'] == 'success' || s['result'] == 'failed');
-      tx.update(noticeRef, {
-        'slots': slots,
-        if (allReported) 'status': 'completed',
-      });
-    });
-
-    // 전체 멤버에게 알림 생성 (트랜잭션 외부 - Transaction.get은 Query 미지원)
-    final membersSnap = await _membersRef(teamId)
-        .where('status', isEqualTo: 'active')
-        .get();
-    final memberIds = membersSnap.docs.map((d) => d.id).toList();
-    if (memberIds.isEmpty) return;
-
-    final noticeSnap = await _noticesRef(teamId).doc(noticeId).get();
-    if (!noticeSnap.exists) return;
-    final data = noticeSnap.data()!;
-    final targetDate = (data['targetDate'] as Timestamp?)?.toDate();
-    final dateStr =
-        targetDate != null ? '${targetDate.month}/${targetDate.day}' : '';
-    final slots = (data['slots'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    final slot = slots.firstWhere(
-          (s) => s['groundId'] == groundId,
-          orElse: () => {'groundName': groundId},
-        );
-    final groundName = slot['groundName'] as String? ?? groundId;
-    final reservedForType = data['reservedForType'] as String? ?? 'class';
-    final typeLabel = reservedForType == 'class' ? '수업' : '매치';
-
-    await _notificationsRef(teamId).add({
-      'title': '구장 예약 성공',
-      'message': '$userName님이 $dateStr $typeLabel · $groundName 예약 성공!',
-      'type': 'reservationSuccess',
-      'relatedId': noticeId,
-      'toUserId': memberIds,
-      'isSent': false,
-      'sendAt': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(),
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'reportReservationResult',
+    );
+    await callable.call({
+      'teamId': teamId,
+      'noticeId': noticeId,
+      'groundId': groundId,
+      'result': 'success',
+      'userId': userId,
+      'userName': userName,
+      'requestId': _requestId('reservation_success'),
     });
   }
 
@@ -148,42 +88,16 @@ class ReservationNoticeRemoteDataSource {
     required String groundId,
     required String userId,
   }) async {
-    final noticeRef = _noticesRef(teamId).doc(noticeId);
-
-    await firestore.runTransaction((tx) async {
-      final noticeSnap = await tx.get(noticeRef);
-      if (!noticeSnap.exists) throw Exception('예약 공지가 존재하지 않습니다');
-
-      final data = noticeSnap.data()!;
-      final slots = (data['slots'] as List?)
-              ?.map((e) => Map<String, dynamic>.from(e as Map))
-              .toList() ??
-          [];
-
-      final slotIndex = slots.indexWhere((s) => s['groundId'] == groundId);
-      if (slotIndex < 0) throw Exception('해당 구장을 찾을 수 없습니다');
-
-      final slot = slots[slotIndex];
-      if (slot['result'] == 'success') {
-        throw Exception('이미 예약 성공 처리되었습니다');
-      }
-
-      if (slot['managers'] == null ||
-          !(slot['managers'] as List).contains(userId)) {
-        throw Exception('해당 구장 담당자가 아닙니다');
-      }
-
-      slot['result'] = 'failed';
-      slot['successBy'] = userId;
-      slot['successAt'] = FieldValue.serverTimestamp();
-
-      final allReported = slots.every((s) =>
-          s['result'] == 'success' || s['result'] == 'failed');
-      if (allReported) {
-        tx.update(noticeRef, {'slots': slots, 'status': 'completed'});
-      } else {
-        tx.update(noticeRef, {'slots': slots});
-      }
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'reportReservationResult',
+    );
+    await callable.call({
+      'teamId': teamId,
+      'noticeId': noticeId,
+      'groundId': groundId,
+      'result': 'failed',
+      'userId': userId,
+      'requestId': _requestId('reservation_failed'),
     });
   }
 

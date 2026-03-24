@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/observability/ops_metrics_provider.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../polls/domain/services/poll_creation_service.dart';
 import '../../../polls/presentation/providers/poll_providers.dart';
@@ -31,6 +32,9 @@ class _DS {
   static const attendGreen = Color(0xFF2EA043);
   static const gold = Color(0xFFFBBF24);
   static const divider = Color(0xFF30363D);
+  static const fixedBlue = Color(0xFF58A6FF);
+  static const cardRadius = 16.0;
+  static const controlHeight = 40.0;
 }
 
 class FeeManagementPage extends ConsumerWidget {
@@ -69,6 +73,11 @@ class FeeManagementPage extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
               children: [
+                if (ref.watch(hasPermissionProvider(Permission.treasurer)) ||
+                    ref.watch(hasPermissionProvider(Permission.admin))) ...[
+                  _OpsFailureSummaryCard(),
+                  const SizedBox(height: 16),
+                ],
                 _NextMonthRegistrationDraftCard(),
                 const SizedBox(height: 16),
                 _CurrentMonthRegistrationCard(),
@@ -152,7 +161,7 @@ class _NextMonthRegistrationDraftCard extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: _DS.bgCard,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(_DS.cardRadius),
             border: Border.all(color: _DS.gold.withValues(alpha: 0.4)),
           ),
           child: Column(
@@ -322,6 +331,7 @@ class _CreateDraftButtonState extends ConsumerState<_CreateDraftButton> {
       style: FilledButton.styleFrom(
         backgroundColor: _DS.gold,
         foregroundColor: _DS.bgDeep,
+        minimumSize: const Size.fromHeight(_DS.controlHeight),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       ),
     );
@@ -351,7 +361,7 @@ class _CurrentMonthRegistrationCard extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _DS.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(_DS.cardRadius),
         border: Border.all(color: _DS.attendGreen.withValues(alpha: 0.3)),
       ),
       child: Column(
@@ -411,6 +421,107 @@ class _CurrentMonthRegistrationCard extends ConsumerWidget {
   }
 }
 
+class _OpsFailureSummaryCard extends ConsumerWidget {
+  const _OpsFailureSummaryCard();
+
+  int _failureCount(Map<String, dynamic>? metrics, String action) {
+    final failures = metrics?['failures'];
+    if (failures is! Map) return 0;
+    final actionMap = failures[action];
+    if (actionMap is! Map) return 0;
+    final total = actionMap['total'];
+    if (total is int) return total;
+    if (total is num) return total.toInt();
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final metricsAsync = ref.watch(todayOpsMetricsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _DS.bgCard,
+        borderRadius: BorderRadius.circular(_DS.cardRadius),
+        border: Border.all(color: _DS.fixedBlue.withValues(alpha: 0.35)),
+      ),
+      child: metricsAsync.when(
+        data: (metrics) {
+          final nudgeFail = _failureCount(metrics, 'sendNudgeToUnpaid');
+          final paymentFail = _failureCount(
+            metrics,
+            'updateRegistrationPaymentStatus',
+          );
+          final reservationFail = _failureCount(
+            metrics,
+            'reportReservationResult',
+          );
+          final total = nudgeFail + paymentFail + reservationFail;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.monitor_heart, color: _DS.fixedBlue, size: 18),
+                  const SizedBox(width: 8),
+                  const Text(
+                    '오늘 운영 실패율 모니터링',
+                    style: TextStyle(
+                      color: _DS.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '$total건',
+                    style: TextStyle(
+                      color: total > 0 ? _DS.gold : _DS.attendGreen,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '회비확정 실패 $paymentFail · 예약보고 실패 $reservationFail · 미납알림 실패 $nudgeFail',
+                style: TextStyle(color: _DS.textSecondary, fontSize: 12),
+              ),
+            ],
+          );
+        },
+        loading: () => Row(
+          children: [
+            Icon(Icons.monitor_heart, color: _DS.fixedBlue, size: 18),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                '오늘 운영 실패율 모니터링 로딩 중...',
+                style: TextStyle(color: _DS.textSecondary, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+        error: (_, __) => Row(
+          children: [
+            Icon(Icons.monitor_heart, color: _DS.fixedBlue, size: 18),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                '운영 실패율 데이터를 불러오지 못했어요',
+                style: TextStyle(color: _DS.textSecondary, fontSize: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _FeeCard extends ConsumerWidget {
   const _FeeCard({required this.fee});
   final Fee fee;
@@ -424,7 +535,7 @@ class _FeeCard extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _DS.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(_DS.cardRadius),
         border: Border.all(color: _DS.divider),
       ),
       child: Column(
@@ -600,6 +711,8 @@ class _PaymentStatus extends StatelessWidget {
                       final result = await callable.call({
                         'teamId': teamId,
                         'feeId': feeId,
+                        'requestId':
+                            '${DateTime.now().microsecondsSinceEpoch}_nudge_$feeId',
                       });
                       if (context.mounted) {
                         final sent = result.data is Map
@@ -696,7 +809,7 @@ class _PaymentStatus extends StatelessWidget {
                   color: isPaid
                       ? _DS.attendGreen.withValues(alpha: 0.1)
                       : _DS.surface,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(_DS.cardRadius),
                   border: Border.all(
                     color: isPaid
                         ? _DS.attendGreen.withValues(alpha: 0.3)

@@ -26,6 +26,8 @@ class _DS {
   static const absentRed = Color(0xFFDA3633);
   static const divider = Color(0xFF30363D);
   static const fixedBlue = Color(0xFF58A6FF);
+  static const cardRadius = 16.0;
+  static const controlHeight = 44.0;
 }
 
 /// 예약 공지 상세 페이지 (성공 버튼 포함)
@@ -121,7 +123,7 @@ class _ReservationNoticeDetailPageState
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: _DS.bgCard,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(_DS.cardRadius),
               border: Border.all(color: _DS.divider),
             ),
             child: Column(
@@ -136,7 +138,7 @@ class _ReservationNoticeDetailPageState
                       ),
                       decoration: BoxDecoration(
                         color: _DS.teamRed.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         '$dateStr $typeLabel',
@@ -174,8 +176,8 @@ class _ReservationNoticeDetailPageState
           const Text(
             '구장별 담당',
             style: TextStyle(
-              color: _DS.textSecondary,
-              fontSize: 14,
+              color: _DS.textPrimary,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
             ),
@@ -229,7 +231,7 @@ class _ReservationNoticeDetailPageState
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: _DS.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(_DS.cardRadius),
           border: Border.all(
             color: isSuccess
                 ? _DS.attendGreen.withValues(alpha: 0.4)
@@ -281,11 +283,25 @@ class _ReservationNoticeDetailPageState
             ),
             if (slot.address != null && slot.address!.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Text(
-                slot.address!,
-                style: TextStyle(color: _DS.textMuted, fontSize: 12),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      slot.address!,
+                      style: TextStyle(color: _DS.textMuted, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => _launchMap(slot.address!),
+                    child: const Icon(
+                      Icons.map_outlined,
+                      size: 16,
+                      color: _DS.fixedBlue,
+                    ),
+                  ),
+                ],
               ),
             ],
             const SizedBox(height: 8),
@@ -336,6 +352,7 @@ class _ReservationNoticeDetailPageState
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _DS.attendGreen,
                         foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(_DS.controlHeight),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -352,6 +369,7 @@ class _ReservationNoticeDetailPageState
                       style: OutlinedButton.styleFrom(
                         foregroundColor: _DS.absentRed,
                         side: const BorderSide(color: _DS.absentRed),
+                        minimumSize: const Size.fromHeight(_DS.controlHeight),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -373,7 +391,7 @@ class _ReservationNoticeDetailPageState
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _DS.gold.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(_DS.cardRadius),
         border: Border.all(color: _DS.gold.withValues(alpha: 0.3)),
       ),
       child: Column(
@@ -506,6 +524,15 @@ class _ReservationNoticeDetailPageState
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _launchMap(String address) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
+    );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

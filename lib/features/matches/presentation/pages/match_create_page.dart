@@ -13,7 +13,6 @@ class _C {
   _C._();
   static const bg = Color(0xFF0D1117);
   static const card = Color(0xFF161B22);
-  static const red = Color(0xFFDC2626);
   static const green = Color(0xFF2EA043);
   static const text = Color(0xFFF0F6FC);
   static const sub = Color(0xFF8B949E);
@@ -33,6 +32,10 @@ class _MatchCreatePageState extends ConsumerState<MatchCreatePage> {
   late DateTime _selectedDate;
   late TimeOfDay _selectedTime;
   final _locationController = TextEditingController();
+  final _venueNameController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _latController = TextEditingController();
+  final _lngController = TextEditingController();
   final _opponentController = TextEditingController();
   final _contactController = TextEditingController();
   int _minPlayers = 7;
@@ -52,6 +55,10 @@ class _MatchCreatePageState extends ConsumerState<MatchCreatePage> {
   @override
   void dispose() {
     _locationController.dispose();
+    _venueNameController.dispose();
+    _addressController.dispose();
+    _latController.dispose();
+    _lngController.dispose();
     _opponentController.dispose();
     _contactController.dispose();
     super.dispose();
@@ -102,6 +109,8 @@ class _MatchCreatePageState extends ConsumerState<MatchCreatePage> {
       final startTime = '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
       final endHour = (_selectedTime.hour + 2) % 24;
       final endTime = '${endHour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
+      final lat = double.tryParse(_latController.text.trim());
+      final lng = double.tryParse(_lngController.text.trim());
 
       String? opponentId = _selectedOpponentId;
       if (opponentId == null && opponentName.isNotEmpty) {
@@ -120,6 +129,10 @@ class _MatchCreatePageState extends ConsumerState<MatchCreatePage> {
         startTime: startTime,
         endTime: endTime,
         location: _locationController.text.trim().isEmpty ? null : _locationController.text.trim(),
+        venueName: _venueNameController.text.trim().isEmpty ? null : _venueNameController.text.trim(),
+        address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
+        lat: lat,
+        lng: lng,
         opponentName: opponentName,
         opponentContact: _contactController.text.trim().isEmpty ? null : _contactController.text.trim(),
         opponentStatus: _opponentStatus,
@@ -167,6 +180,42 @@ class _MatchCreatePageState extends ConsumerState<MatchCreatePage> {
               label: '장소',
               hint: '예: 석수 다목적구장',
               icon: Icons.location_on,
+            ),
+            const SizedBox(height: 16),
+            _buildTextField(
+              controller: _venueNameController,
+              label: '장소명(표시용)',
+              hint: '예: 석수 풋살장 A코트',
+              icon: Icons.stadium_outlined,
+            ),
+            const SizedBox(height: 16),
+            _buildTextField(
+              controller: _addressController,
+              label: '주소',
+              hint: '예: 서울 금천구 ...',
+              icon: Icons.place_outlined,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    controller: _latController,
+                    label: '위도(lat)',
+                    hint: '37.1234',
+                    icon: Icons.gps_fixed,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTextField(
+                    controller: _lngController,
+                    label: '경도(lng)',
+                    hint: '126.1234',
+                    icon: Icons.gps_not_fixed,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             _buildOpponentSection(),

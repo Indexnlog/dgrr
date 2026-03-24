@@ -29,6 +29,19 @@ flutter run -d ios
 
 ---
 
+## App Check (보안)
+
+- 앱은 기본적으로 App Check 초기화를 시도합니다.
+- 웹은 `FIREBASE_APP_CHECK_WEB_SITE_KEY`가 없으면 App Check를 건너뜁니다.
+- 에뮬레이터 모드(`USE_FIREBASE_EMULATOR=true`)에서는 App Check를 생략합니다.
+
+```bash
+# 웹 빌드/배포 시 예시
+--dart-define=FIREBASE_APP_CHECK_WEB_SITE_KEY=YOUR_RECAPTCHA_V3_SITE_KEY
+```
+
+---
+
 ## 문서
 
 | 문서 | 설명 |

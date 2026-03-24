@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../observability/crashlytics_service.dart';
 import 'exceptions.dart';
 
 /// 에러를 사용자 친화적 메시지로 변환
@@ -44,6 +45,15 @@ class ErrorHandler {
 
   /// SnackBar로 에러 표시
   static void showError(BuildContext context, Object error, {String? fallback}) {
+    // 사용자에게 노출되는 핸들드 에러도 비치명 로그로 수집
+    final stack = StackTrace.current;
+    CrashlyticsService.recordError(
+      error,
+      stack,
+      reason: 'showError',
+      fatal: false,
+    );
+
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

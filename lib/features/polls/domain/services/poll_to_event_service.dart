@@ -58,6 +58,7 @@ class PollToEventService {
         startTime: defaultStartTime,
         endTime: defaultEndTime,
         location: defaultLocation,
+        venueName: defaultLocation,
         status: EventStatus.active,
         fromPoll: true,
         pollId: poll.pollId,

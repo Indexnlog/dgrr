@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../domain/entities/registration.dart';
 import '../models/registration_model.dart';
@@ -8,6 +9,8 @@ class RegistrationRemoteDataSource {
   RegistrationRemoteDataSource({required this.firestore});
 
   final FirebaseFirestore firestore;
+  String _requestId(String action) =>
+      '${DateTime.now().microsecondsSinceEpoch}_$action';
 
   CollectionReference<Map<String, dynamic>> _regsRef(String teamId) =>
       firestore.collection('teams').doc(teamId).collection('registrations');
@@ -68,9 +71,14 @@ class RegistrationRemoteDataSource {
     String registrationId,
     String status,
   ) async {
-    await _regsRef(teamId).doc(registrationId).update({
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'updateRegistrationPaymentStatus',
+    );
+    await callable.call({
+      'teamId': teamId,
+      'registrationId': registrationId,
       'status': status,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'requestId': _requestId('registration_payment'),
     });
   }
 

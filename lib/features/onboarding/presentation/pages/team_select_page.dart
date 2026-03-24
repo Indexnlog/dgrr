@@ -14,6 +14,7 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_providers.dart';
+import '../../../../admin/admin_config.dart';
 import '../../domain/entities/public_team.dart';
 import '../providers/public_teams_provider.dart';
 
@@ -274,6 +275,11 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
     final teamsAsync = ref.watch(publicTeamsStreamProvider);
     final userTeamsAsync = ref.watch(userTeamsAsPublicProvider);
     final firebaseReady = ref.watch(firebaseReadyProvider);
+    final currentUser = ref.watch(currentUserProvider);
+    final canOpenAdmin =
+        kIsWeb &&
+        currentUser?.email != null &&
+        adminAllowedEmails.contains(currentUser!.email);
 
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
@@ -298,7 +304,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
               style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
             ),
           ),
-          if (kIsWeb)
+          if (canOpenAdmin)
             IconButton(
               onPressed: () => nav_admin.navigateToAdmin(),
               icon: Icon(Icons.admin_panel_settings, size: 20, color: Colors.white.withValues(alpha: 0.9)),
@@ -318,7 +324,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
       ),
       body: Column(
         children: [
-          if (kIsWeb)
+          if (canOpenAdmin)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: Material(
@@ -334,7 +340,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                         Icon(Icons.admin_panel_settings, size: 20, color: AppTheme.primaryBlue),
                         const SizedBox(width: 10),
                         Text(
-                          '어드민 접속 (팀 등록·가입 승인)',
+                          '운영진 어드민 접속',
                           style: const TextStyle(
                             color: AppTheme.textPrimary,
                             fontSize: 14,

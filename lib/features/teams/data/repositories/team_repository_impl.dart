@@ -57,9 +57,13 @@ class TeamRepositoryImpl implements TeamRepository {
     await firestore
         .collection('teams')
         .doc(teamId)
-        .collection('members')
+        .collection('member_tokens')
         .doc(memberId)
-        .set({'fcmToken': fcmToken}, SetOptions(merge: true));
+        .set({
+      'fcmToken': fcmToken,
+      'active': fcmToken != null && fcmToken.isNotEmpty,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   @override
