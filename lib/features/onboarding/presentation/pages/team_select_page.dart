@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../app/providers/firebase_ready_provider.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -33,6 +34,9 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   ProviderSubscription<AsyncValue<List<PublicTeam>>>? _teamsSubscription;
+  bool _didShowIntroPopup = false;
+
+  static const _prefIntroPopupSeen = 'dgrr_intro_popup_seen_v1';
 
   @override
   void initState() {
@@ -43,6 +47,64 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
         if (next.hasError) {
           _showSnackBar('팀 목록을 불러오지 못했습니다.');
         }
+      },
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowIntroPopup();
+    });
+  }
+
+  Future<void> _maybeShowIntroPopup() async {
+    if (!mounted || _didShowIntroPopup) return;
+    _didShowIntroPopup = true;
+
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool(_prefIntroPopupSeen) ?? false;
+    if (seen || !mounted) return;
+
+    // 표시 즉시 1회 처리(앱 종료/크래시에도 반복 노출 방지)
+    await prefs.setBool(_prefIntroPopupSeen, true);
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.bgCard,
+          titleTextStyle: const TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+          contentTextStyle: const TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 13,
+            height: 1.4,
+          ),
+          title: const Text('처음 오셨나요?'),
+          content: const Text(
+            'DGRR은 팀 운영을 단순하게 만들기 위한 앱이에요.\n'
+            '먼저 “DGRR 소개”를 확인하고, 팀을 선택해 참여 신청을 진행해 주세요.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('닫기'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.push('/welcome');
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('DGRR 소개 보기'),
+            ),
+          ],
+        );
       },
     );
   }
