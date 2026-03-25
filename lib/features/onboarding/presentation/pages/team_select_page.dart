@@ -6,9 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/providers/firebase_ready_provider.dart';
-import '../../../../core/utils/navigate_admin_stub.dart'
-    if (dart.library.html) '../../../../core/utils/navigate_admin_web.dart' as nav_admin;
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/navigate_admin.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
@@ -306,7 +305,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
           ),
           if (canOpenAdmin)
             IconButton(
-              onPressed: () => nav_admin.navigateToAdmin(),
+              onPressed: navigateToAdmin,
               icon: Icon(Icons.admin_panel_settings, size: 20, color: Colors.white.withValues(alpha: 0.9)),
               tooltip: '어드민 (팀 등록·가입 승인)',
               style: IconButton.styleFrom(foregroundColor: Colors.white),
@@ -331,7 +330,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                 color: AppTheme.primaryBlue.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
                 child: InkWell(
-                  onTap: () => nav_admin.navigateToAdmin(),
+                  onTap: navigateToAdmin,
                   borderRadius: BorderRadius.circular(10),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

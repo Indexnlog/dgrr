@@ -5,6 +5,7 @@ import 'platform_stub.dart' if (dart.library.io) 'dart:io' as io;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../../../core/notifications/local_notifications_service.dart';
 import '../../../auth/presentation/providers/auth_state_provider.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
 import '../../../teams/presentation/providers/team_providers.dart';
@@ -26,6 +27,8 @@ class FcmService {
 
   /// FCM 초기화 (앱 시작 시 호출)
   Future<void> initialize() async {
+    await LocalNotificationsService.initialize();
+
     // 권한 요청 (iOS, Android 13+)
     final settings = await _messaging.requestPermission(
       alert: true,
@@ -39,6 +42,8 @@ class FcmService {
       }
       return;
     }
+
+    await LocalNotificationsService.requestPermissions();
 
     // 포그라운드 메시지 표시 설정 (iOS만, 웹에서는 Platform 사용 불가)
     if (!kIsWeb && io.Platform.isIOS) {
@@ -93,7 +98,20 @@ class FcmService {
     if (kDebugMode) {
       debugPrint('[FCM] 포그라운드 메시지: ${message.notification?.title}');
     }
-    // TODO: 인앱 배너 등 표시 (flutter_local_notifications 활용 가능)
+
+    final title = message.notification?.title ??
+        (message.data['title'] as String?) ??
+        '알림';
+    final body = message.notification?.body ??
+        (message.data['body'] as String?) ??
+        '';
+
+    if (body.trim().isEmpty) return;
+
+    LocalNotificationsService.showForegroundNotification(
+      title: title,
+      body: body,
+    );
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {

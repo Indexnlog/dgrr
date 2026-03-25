@@ -4,9 +4,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/error_handler.dart';
 import '../../../../core/permissions/permission_checker.dart';
+import '../../../../core/widgets/cute_empty_state.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../domain/entities/poll.dart';
-import '../providers/poll_providers.dart';
+import '../providers/poll_paging_provider.dart';
 
 class _DS {
   _DS._();
@@ -30,21 +31,9 @@ class PollListPage extends ConsumerStatefulWidget {
 }
 
 class _PollListPageState extends ConsumerState<PollListPage> {
-  static const int _pageSize = 20;
-  int _pageLimit = _pageSize;
-  bool _isPaging = false;
-
-  void _requestNextPage(int currentCount) {
-    if (_isPaging || currentCount < _pageLimit) return;
-    setState(() {
-      _isPaging = true;
-      _pageLimit += _pageSize;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final pollsAsync = ref.watch(allPollsWithLimitProvider(_pageLimit));
+    final paging = ref.watch(pollPagingProvider);
     final isAdmin = PermissionChecker.isAdmin(ref);
 
     return Scaffold(
@@ -66,91 +55,68 @@ class _PollListPageState extends ConsumerState<PollListPage> {
             ),
         ],
       ),
-      body: pollsAsync.when(
-        data: (polls) {
-          if (_isPaging) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() {
-                  _isPaging = false;
-                });
-              }
-            });
-          }
-          final hasMore = polls.length >= _pageLimit;
-          if (polls.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: () async =>
-                  ref.invalidate(allPollsWithLimitProvider(_pageLimit)),
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 48),
-                children: [
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.ballot_outlined,
-                        size: 48,
-                        color: _DS.textMuted.withValues(alpha: 0.4),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '아직 투표가 없습니다',
-                        style: TextStyle(color: _DS.textMuted, fontSize: 14),
-                      ),
-                    ],
+      body: paging.isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: _DS.teamRed,
+                strokeWidth: 2.5,
+              ),
+            )
+          : paging.error != null
+              ? ErrorRetryView(
+                  message: ErrorHandler.toUserMessage(
+                    paging.error!,
+                    fallback: '투표 목록을 불러올 수 없습니다',
                   ),
-                ],
-              ),
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () async =>
-                ref.invalidate(allPollsWithLimitProvider(_pageLimit)),
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification.metrics.pixels >=
-                    notification.metrics.maxScrollExtent - 180) {
-                  _requestNextPage(polls.length);
-                }
-                return false;
-              },
-              child: ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-                itemCount: polls.length + (hasMore || _isPaging ? 1 : 0),
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  if (index >= polls.length) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: _DS.teamRed,
-                          strokeWidth: 2,
-                        ),
-                      ),
-                    );
-                  }
-                  return _PollCard(poll: polls[index]);
-                },
-              ),
-            ),
-          );
-        },
-        loading: () => const Center(
-          child: CircularProgressIndicator(
-            color: _DS.teamRed,
-            strokeWidth: 2.5,
-          ),
-        ),
-        error: (e, _) => ErrorRetryView(
-          message: ErrorHandler.toUserMessage(e, fallback: '투표 목록을 불러올 수 없습니다'),
-          detail: e.toString(),
-          onRetry: () => ref.invalidate(allPollsWithLimitProvider(_pageLimit)),
-        ),
-      ),
+                  detail: paging.error.toString(),
+                  onRetry: () => ref.read(pollPagingProvider.notifier).refresh(),
+                )
+              : RefreshIndicator(
+                  onRefresh: () => ref.read(pollPagingProvider.notifier).refresh(),
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification.metrics.pixels >=
+                          notification.metrics.maxScrollExtent - 180) {
+                        ref.read(pollPagingProvider.notifier).loadMore();
+                      }
+                      return false;
+                    },
+                    child: ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                      itemCount:
+                          paging.polls.length +
+                          ((paging.hasMore || paging.isLoadingMore) ? 1 : 0),
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        if (paging.polls.isEmpty && index == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: const CuteEmptyState(
+                              title: '아직 투표가 없어요',
+                              subtitle: '오른쪽 위 + 버튼으로 첫 투표를 만들어보세요.',
+                              icon: Icons.ballot_outlined,
+                            ),
+                          );
+                        }
+
+                        if (index >= paging.polls.length) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: _DS.teamRed,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          );
+                        }
+
+                        return _PollCard(poll: paging.polls[index]);
+                      },
+                    ),
+                  ),
+                ),
     );
   }
 }

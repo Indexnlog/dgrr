@@ -50,6 +50,44 @@ class PollRemoteDataSource {
         );
   }
 
+  /// 투표 페이지 조회 (createdAt 최신순) - 서버 커서 기반
+  Future<
+    ({
+      List<PollModel> polls,
+      QueryDocumentSnapshot<Map<String, dynamic>>? lastDoc,
+      bool hasMore,
+    })
+  >
+  fetchPollsPage(
+    String teamId, {
+    QueryDocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int limit = 20,
+  }) async {
+    Query<Map<String, dynamic>> query =
+        _pollsRef(teamId).orderBy('createdAt', descending: true).limit(limit);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    try {
+      final snap = await query.get();
+      final docs = snap.docs;
+      return (
+        polls: docs
+            .map((d) => PollModel.fromFirestore(d.id, d.data()))
+            .toList(),
+        lastDoc: docs.isNotEmpty ? docs.last : null,
+        hasMore: docs.length == limit,
+      );
+    } catch (error) {
+      throw mapFirebaseException(
+        error,
+        fallbackMessage: '투표 목록을 불러오는 중 오류가 발생했습니다',
+      );
+    }
+  }
+
   /// 특정 월의 월별 등록 투표 조회 (category=membership, targetMonth)
   Stream<PollModel?> watchMembershipPollForMonth(
     String teamId,

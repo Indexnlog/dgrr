@@ -1,9 +1,9 @@
-/// 앱 컬러 팔레트 (레퍼런스 이미지 기반)
-///
-/// 참고: design-system/COLOR_PALETTE.md
-/// - 18_palette_hex: 기본 6색
-/// - 19_palette_opacity: Inch Worm, Science Blue 등
-/// - 20_brand_colors: 브랜드 4색
+// 앱 컬러 팔레트 (레퍼런스 이미지 기반)
+//
+// 참고: design-system/COLOR_PALETTE.md
+// - 18_palette_hex: 기본 6색
+// - 19_palette_opacity: Inch Worm, Science Blue 등
+// - 20_brand_colors: 브랜드 4색
 import 'package:flutter/material.dart';
 
 class AppPalette {

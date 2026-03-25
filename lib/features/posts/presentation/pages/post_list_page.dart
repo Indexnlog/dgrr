@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/errors/error_handler.dart';
 import '../../../../core/permissions/permission_checker.dart';
+import '../../../../core/widgets/cute_empty_state.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../data/models/post_model.dart';
 import '../../../teams/presentation/providers/current_team_provider.dart';
@@ -17,7 +18,6 @@ class _DS {
   static const bgCard = Color(0xFF161B22);
   static const teamRed = Color(0xFFDC2626);
   static const textPrimary = Color(0xFFF0F6FC);
-  static const textSecondary = Color(0xFF8B949E);
   static const textMuted = Color(0xFF484F58);
   static const attendGreen = Color(0xFF2EA043);
   static const divider = Color(0xFF30363D);
@@ -287,25 +287,17 @@ class _PostListPageState extends ConsumerState<PostListPage> {
                         searchWidget,
                         Padding(
                           padding: const EdgeInsets.only(top: 24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                _posts.isEmpty
-                                    ? Icons.campaign_outlined
-                                    : Icons.search_off_rounded,
-                                color: _DS.textMuted,
-                                size: 48,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _posts.isEmpty ? '등록된 공지가 없습니다' : '검색 결과가 없습니다',
-                                style: TextStyle(
-                                  color: _DS.textSecondary,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ],
+                          child: CuteEmptyState(
+                            title: _posts.isEmpty
+                                ? '등록된 공지가 없어요'
+                                : '검색 결과가 없어요',
+                            subtitle: _posts.isEmpty
+                                ? '첫 공지를 작성해서 팀에게 공유해보세요.'
+                                : '검색어를 바꿔서 다시 찾아보세요.',
+                            icon: _posts.isEmpty
+                                ? Icons.campaign_outlined
+                                : Icons.search_off_rounded,
+                            accentColor: _DS.teamRed,
                           ),
                         ),
                       ],

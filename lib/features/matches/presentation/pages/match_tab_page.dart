@@ -5,9 +5,10 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../../core/errors/error_handler.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/cute_empty_state.dart';
 import '../../../../core/widgets/error_retry_view.dart';
 import '../../domain/entities/match.dart';
-import '../providers/match_providers.dart';
+import '../providers/match_paging_provider.dart';
 
 class MatchTabPage extends ConsumerStatefulWidget {
   const MatchTabPage({super.key});
@@ -17,19 +18,8 @@ class MatchTabPage extends ConsumerStatefulWidget {
 }
 
 class _MatchTabPageState extends ConsumerState<MatchTabPage> {
-  static const int _pageSize = 20;
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  int _pageLimit = _pageSize;
-  bool _isPaging = false;
-
-  void _requestNextPage(int currentCount) {
-    if (_isPaging || currentCount < _pageLimit) return;
-    setState(() {
-      _isPaging = true;
-      _pageLimit += _pageSize;
-    });
-  }
 
   @override
   void dispose() {
@@ -39,9 +29,7 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
 
   @override
   Widget build(BuildContext context) {
-    final matchesAsync = ref.watch(
-      upcomingMatchesWithLimitProvider(_pageLimit),
-    );
+    final paging = ref.watch(matchPagingProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.bgDeep,
@@ -106,122 +94,33 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
               ),
             ),
             Expanded(
-              child: matchesAsync.when(
-                data: (matches) {
-                  if (_isPaging) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) {
-                        setState(() {
-                          _isPaging = false;
-                        });
-                      }
-                    });
-                  }
-                  final filtered = _searchQuery.isEmpty
-                      ? matches
-                      : matches
-                            .where(
-                              (m) => (m.opponentName ?? '')
-                                  .toLowerCase()
-                                  .contains(_searchQuery),
-                            )
-                            .toList();
-                  final hasMore = matches.length >= _pageLimit;
-                  if (filtered.isEmpty) {
-                    return RefreshIndicator(
-                      onRefresh: () async {
-                        ref.invalidate(
-                          upcomingMatchesWithLimitProvider(_pageLimit),
-                        );
-                      },
-                      color: AppTheme.teamRed,
-                      child: ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
-                        children: [
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                PhosphorIconsRegular.soccerBall,
-                                size: 56,
-                                color: AppTheme.textMuted.withValues(
-                                  alpha: 0.4,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _searchQuery.isEmpty
-                                    ? '예정된 매치가 없습니다'
-                                    : '검색 결과가 없습니다',
-                                style: const TextStyle(
-                                  color: AppTheme.textMuted,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
+              child: paging.isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.accentLime,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : paging.error != null
+                      ? ErrorRetryView(
+                          message: ErrorHandler.toUserMessage(
+                            paging.error!,
+                            fallback: '경기 목록을 불러올 수 없습니다',
                           ),
-                        ],
-                      ),
-                    );
-                  }
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      ref.invalidate(
-                        upcomingMatchesWithLimitProvider(_pageLimit),
-                      );
-                    },
-                    color: AppTheme.teamRed,
-                    child: NotificationListener<ScrollNotification>(
-                      onNotification: (notification) {
-                        if (notification.metrics.pixels >=
-                            notification.metrics.maxScrollExtent - 180) {
-                          _requestNextPage(matches.length);
-                        }
-                        return false;
-                      },
-                      child: ListView.separated(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                        itemCount:
-                            filtered.length + ((hasMore || _isPaging) ? 1 : 0),
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          if (index >= filtered.length) {
-                            return const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  color: AppTheme.accentLime,
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            );
-                          }
-                          final match = filtered[index];
-                          return _MatchListTile(match: match, index: index);
-                        },
-                      ),
-                    ),
-                  );
-                },
-                loading: () => const Center(
-                  child: CircularProgressIndicator(
-                    color: AppTheme.accentLime,
-                    strokeWidth: 2,
-                  ),
-                ),
-                error: (e, _) => ErrorRetryView(
-                  message: ErrorHandler.toUserMessage(
-                    e,
-                    fallback: '경기 목록을 불러올 수 없습니다',
-                  ),
-                  detail: e.toString(),
-                  onRetry: () => ref.invalidate(
-                    upcomingMatchesWithLimitProvider(_pageLimit),
-                  ),
-                ),
-              ),
+                          detail: paging.error.toString(),
+                          onRetry: () =>
+                              ref.read(matchPagingProvider.notifier).refresh(),
+                        )
+                      : _MatchesList(
+                          matches: paging.matches,
+                          hasMore: paging.hasMore,
+                          isLoadingMore: paging.isLoadingMore,
+                          searchQuery: _searchQuery,
+                          onRefresh: () =>
+                              ref.read(matchPagingProvider.notifier).refresh(),
+                          onLoadMore: () =>
+                              ref.read(matchPagingProvider.notifier).loadMore(),
+                        ),
             ),
           ],
         ),
@@ -231,6 +130,91 @@ class _MatchTabPageState extends ConsumerState<MatchTabPage> {
         backgroundColor: AppTheme.accentLime,
         foregroundColor: Colors.black,
         child: const Icon(PhosphorIconsFill.plus, size: 28),
+      ),
+    );
+  }
+}
+
+class _MatchesList extends StatelessWidget {
+  const _MatchesList({
+    required this.matches,
+    required this.hasMore,
+    required this.isLoadingMore,
+    required this.searchQuery,
+    required this.onRefresh,
+    required this.onLoadMore,
+  });
+
+  final List<Match> matches;
+  final bool hasMore;
+  final bool isLoadingMore;
+  final String searchQuery;
+  final Future<void> Function() onRefresh;
+  final VoidCallback onLoadMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = searchQuery.isEmpty
+        ? matches
+        : matches
+            .where(
+              (m) => (m.opponentName ?? '').toLowerCase().contains(searchQuery),
+            )
+            .toList();
+
+    if (filtered.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        color: AppTheme.teamRed,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
+          children: [
+            CuteEmptyState(
+              title: searchQuery.isEmpty ? '예정된 매치가 없어요' : '검색 결과가 없어요',
+              subtitle: searchQuery.isEmpty
+                  ? '새 매치를 만들거나, 참석 투표를 받아볼까요?'
+                  : '검색어를 바꿔서 다시 찾아보세요.',
+              icon: PhosphorIconsRegular.soccerBall,
+              accentColor: AppTheme.accentLime,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      color: AppTheme.teamRed,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.pixels >=
+              notification.metrics.maxScrollExtent - 180) {
+            onLoadMore();
+          }
+          return false;
+        },
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+          itemCount: filtered.length + ((hasMore || isLoadingMore) ? 1 : 0),
+          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          itemBuilder: (context, index) {
+            if (index >= filtered.length) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppTheme.accentLime,
+                    strokeWidth: 2,
+                  ),
+                ),
+              );
+            }
+            final match = filtered[index];
+            return _MatchListTile(match: match, index: index);
+          },
+        ),
       ),
     );
   }

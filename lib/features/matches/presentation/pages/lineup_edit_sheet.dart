@@ -12,7 +12,6 @@ class _C {
   _C._();
   static const bg = Color(0xFF0D1117);
   static const card = Color(0xFF161B22);
-  static const red = Color(0xFFDC2626);
   static const green = Color(0xFF2EA043);
   static const text = Color(0xFFF0F6FC);
   static const sub = Color(0xFF8B949E);

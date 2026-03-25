@@ -138,15 +138,15 @@ Future<void> _initializeAppCheck() async {
     }
 
     await FirebaseAppCheck.instance.activate(
-      webProvider: kIsWeb ? ReCaptchaV3Provider(webSiteKey) : null,
+      providerWeb: kIsWeb ? ReCaptchaV3Provider(webSiteKey) : null,
       // 디버그 빌드: debug provider / 릴리스: Play Integrity
-      androidProvider: kDebugMode
-          ? AndroidProvider.debug
-          : AndroidProvider.playIntegrity,
+      providerAndroid: kDebugMode
+          ? const AndroidDebugProvider()
+          : const AndroidPlayIntegrityProvider(),
       // 디버그 빌드: debug provider / 릴리스: App Attest 우선
-      appleProvider: kDebugMode
-          ? AppleProvider.debug
-          : AppleProvider.appAttestWithDeviceCheckFallback,
+      providerApple: kDebugMode
+          ? const AppleDebugProvider()
+          : const AppleAppAttestWithDeviceCheckFallbackProvider(),
     );
 
     if (kDebugMode) {

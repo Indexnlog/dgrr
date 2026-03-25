@@ -109,6 +109,47 @@ class MatchRemoteDataSource {
         );
   }
 
+  /// 다가오는 경기 페이지 조회 (date 오름차순) - 서버 커서 기반
+  Future<
+    ({
+      List<MatchModel> matches,
+      QueryDocumentSnapshot<Map<String, dynamic>>? lastDoc,
+      bool hasMore,
+    })
+  >
+  fetchUpcomingMatchesPage(
+    String teamId, {
+    required DateTime todayStart,
+    QueryDocumentSnapshot<Map<String, dynamic>>? startAfter,
+    int limit = 20,
+  }) async {
+    Query<Map<String, dynamic>> query = _matchesRef(teamId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
+        .orderBy('date')
+        .limit(limit);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    try {
+      final snap = await query.get();
+      final docs = snap.docs;
+      return (
+        matches: docs
+            .map((d) => MatchModel.fromFirestore(d.id, d.data()))
+            .toList(),
+        lastDoc: docs.isNotEmpty ? docs.last : null,
+        hasMore: docs.length == limit,
+      );
+    } catch (error) {
+      throw mapFirebaseException(
+        error,
+        fallbackMessage: '다가오는 경기 목록을 불러오는 중 오류가 발생했습니다',
+      );
+    }
+  }
+
   /// 참석 투표 (트랜잭션: attendees 추가 + 자동 성사 전환)
   Future<VoteResult> voteAttend(
     String teamId,

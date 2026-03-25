@@ -1,7 +1,7 @@
-/// 앱 타이포그래피 (레퍼런스 앱 퀄리티)
-///
-/// - Noto Sans KR: 한국어 가독성, 모던 산세리프
-/// - letterSpacing, height로 시각적 계층 강화
+// 앱 타이포그래피 (레퍼런스 앱 퀄리티)
+//
+// - Noto Sans KR: 한국어 가독성, 모던 산세리프
+// - letterSpacing, height로 시각적 계층 강화
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
