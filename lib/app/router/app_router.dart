@@ -19,6 +19,7 @@ import '../../features/mypage/presentation/pages/terms_page.dart';
 import '../../features/teams/presentation/pages/team_settings_page.dart';
 import '../../features/onboarding/presentation/pages/pending_approval_page.dart';
 import '../../features/onboarding/presentation/pages/team_select_page.dart';
+import '../../features/onboarding/presentation/pages/dgrr_intro_page.dart';
 import '../../features/onboarding/presentation/pages/welcome_guide_page.dart';
 import '../../features/teams/domain/entities/member.dart';
 import '../../features/teams/presentation/providers/current_member_status_provider.dart';
@@ -78,6 +79,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/welcome',
         name: 'welcome-guide',
+        builder: (context, state) => const DgrrIntroPage(),
+      ),
+      GoRoute(
+        path: '/teams/youngwon_fc/guide',
+        name: 'youngwon-guide',
         builder: (context, state) => const WelcomeGuidePage(),
       ),
       StatefulShellRoute(

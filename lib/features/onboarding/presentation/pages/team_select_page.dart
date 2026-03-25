@@ -287,7 +287,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          '팀 선택',
+          'DGRR',
           style: TextStyle(
             color: Colors.white,
             fontSize: 18,
@@ -299,7 +299,7 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
             onPressed: () => context.push('/welcome'),
             icon: Icon(Icons.menu_book, size: 18, color: Colors.white.withValues(alpha: 0.9)),
             label: Text(
-              '영원FC 안내',
+              'DGRR 소개',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
             ),
           ),
@@ -323,6 +323,12 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: _DgrrIntroCard(
+              onTap: () => context.push('/welcome'),
+            ),
+          ),
           if (canOpenAdmin)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -435,14 +441,43 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                 ),
                 teamsAsync.when(
                   data: (teams) {
-                    // 일단 우리팀만 노출
-                    final ourTeamList = teams.where((t) => t.id == _ourTeamId).toList();
+                    // 일단 우리팀만 노출 (teams_public 미생성/비어있을 수 있어 fallback 제공)
+                    final baseTeams = teams.isEmpty
+                        ? const [
+                            PublicTeam(
+                              id: _ourTeamId,
+                              name: '영원FC',
+                              logoUrl: '',
+                              region: '서울',
+                              intro: '풋살팀 운영을 앱으로 더 간단하게. (가입은 운영진 승인 후 완료돼요)',
+                            ),
+                          ]
+                        : teams;
+
+                    final ourTeamList =
+                        baseTeams.where((t) => t.id == _ourTeamId).toList();
                     final filtered = _searchQuery.isEmpty
                         ? ourTeamList
                         : ourTeamList.where((t) =>
                             t.name.toLowerCase().contains(_searchQuery) ||
                             t.region.toLowerCase().contains(_searchQuery) ||
                             t.intro.toLowerCase().contains(_searchQuery)).toList();
+
+                    if (filtered.isEmpty) {
+                      return const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Text(
+                              '표시할 팀이 없습니다.',
+                              style: TextStyle(color: AppTheme.textMuted),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
                     return SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -457,6 +492,9 @@ class _TeamSelectPageState extends ConsumerState<TeamSelectPage> {
                               onTap: () => setState(() => _selectedTeamId = team.id),
                               onJoin: isSelected && !_isSigningIn
                                   ? () => _handleJoin(team)
+                                  : null,
+                              onGuide: isSelected && team.id == _ourTeamId
+                                  ? () => context.push('/teams/youngwon_fc/guide')
                                   : null,
                             ),
                           );
@@ -587,6 +625,7 @@ class _TeamCard extends StatelessWidget {
     required this.onTap,
     this.onJoin,
     this.onEnter,
+    this.onGuide,
   });
 
   final PublicTeam team;
@@ -595,6 +634,7 @@ class _TeamCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onJoin;
   final VoidCallback? onEnter;
+  final VoidCallback? onGuide;
 
   @override
   Widget build(BuildContext context) {
@@ -665,33 +705,123 @@ class _TeamCard extends StatelessWidget {
                 ),
                 if (onEnter != null || onJoin != null) ...[
                   const SizedBox(height: 14),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton(
-                      onPressed: onEnter ?? (isSigningIn ? null : onJoin),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppTheme.accentGreen,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                  Row(
+                    children: [
+                      if (onGuide != null)
+                        TextButton.icon(
+                          onPressed: onGuide,
+                          icon: const Icon(Icons.info_outline, size: 18),
+                          label: const Text('팀 안내'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.textSecondary,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
                         ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: onEnter ?? (isSigningIn ? null : onJoin),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppTheme.accentGreen,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: isSigningIn && onJoin != null
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(onEnter != null ? '들어가기' : '참여하기'),
                       ),
-                      child: isSigningIn && onJoin != null
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(onEnter != null ? '들어가기' : '참여하기'),
-                    ),
+                    ],
                   ),
                 ],
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DgrrIntroCard extends StatelessWidget {
+  const _DgrrIntroCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.bgCard,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.divider),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppTheme.accentLime.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  color: AppTheme.accentLime,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '팀 운영을 더 단순하게',
+                      style: TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '처음이라면 DGRR 소개를 먼저 확인해 주세요.',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: AppTheme.textMuted,
+              ),
+            ],
           ),
         ),
       ),
